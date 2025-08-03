@@ -8,11 +8,13 @@ export class ProjectIgnitionProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly _workflowManager: WorkflowManager
-  ) {}
+  ) {
+    // Initialize provider with extension URI and workflow manager
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
-    context: vscode.WebviewViewResolveContext,
+    _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ) {
     this._view = webviewView.webview;

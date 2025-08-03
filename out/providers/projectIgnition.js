@@ -39,8 +39,9 @@ class ProjectIgnitionProvider {
     constructor(_extensionUri, _workflowManager) {
         this._extensionUri = _extensionUri;
         this._workflowManager = _workflowManager;
+        // Initialize provider with extension URI and workflow manager
     }
-    resolveWebviewView(webviewView, context, _token) {
+    resolveWebviewView(webviewView, _context, _token) {
         this._view = webviewView.webview;
         webviewView.webview.options = {
             enableScripts: true,

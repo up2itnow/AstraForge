@@ -1,0 +1,43 @@
+0 info it worked if it ends with ok
+1 verbose cli [
+1 verbose cli   'C:\\nvm4w\\nodejs\\node.exe',
+1 verbose cli   'C:\\Users\\up2it\\node_modules\\npm\\bin\\npm-cli.js',
+1 verbose cli   'run',
+1 verbose cli   'lint'
+1 verbose cli ]
+2 info using npm@2.15.12
+3 info using node@v20.19.3
+4 verbose run-script [ 'prelint', 'lint', 'postlint' ]
+5 info prelint astraforge-ide@0.0.1
+6 info lint astraforge-ide@0.0.1
+7 verbose unsafe-perm in lifecycle true
+8 info astraforge-ide@0.0.1 Failed to exec lint script
+9 verbose stack Error: astraforge-ide@0.0.1 lint: `eslint src/**/*.ts`
+9 verbose stack Exit status 1
+9 verbose stack     at EventEmitter.<anonymous> (C:\Users\up2it\node_modules\npm\lib\utils\lifecycle.js:217:16)
+9 verbose stack     at EventEmitter.emit (node:events:524:28)
+9 verbose stack     at ChildProcess.<anonymous> (C:\Users\up2it\node_modules\npm\lib\utils\spawn.js:24:14)
+9 verbose stack     at ChildProcess.emit (node:events:524:28)
+9 verbose stack     at maybeClose (node:internal/child_process:1104:16)
+9 verbose stack     at ChildProcess._handle.onexit (node:internal/child_process:304:5)
+10 verbose pkgid astraforge-ide@0.0.1
+11 verbose cwd C:\Users\up2it\Desktop\AstraForge
+12 error Windows_NT 10.0.26100
+13 error argv "C:\\nvm4w\\nodejs\\node.exe" "C:\\Users\\up2it\\node_modules\\npm\\bin\\npm-cli.js" "run" "lint"
+14 error node v20.19.3
+15 error npm  v2.15.12
+16 error code ELIFECYCLE
+17 error astraforge-ide@0.0.1 lint: `eslint src/**/*.ts`
+17 error Exit status 1
+18 error Failed at the astraforge-ide@0.0.1 lint script 'eslint src/**/*.ts'.
+18 error This is most likely a problem with the astraforge-ide package,
+18 error not with npm itself.
+18 error Tell the author that this fails on your system:
+18 error     eslint src/**/*.ts
+18 error You can get information on how to open an issue for this project with:
+18 error     npm bugs astraforge-ide
+18 error Or if that isn't available, you can get their info via:
+18 error
+18 error     npm owner ls astraforge-ide
+18 error There is likely additional logging output above.
+19 verbose exit [ 1, true ]

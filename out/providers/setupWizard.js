@@ -38,8 +38,9 @@ const vscode = __importStar(require("vscode"));
 class SetupWizardProvider {
     constructor(_extensionUri) {
         this._extensionUri = _extensionUri;
+        // Initialize setup wizard with extension URI
     }
-    resolveWebviewView(webviewView, context, _token) {
+    resolveWebviewView(webviewView, _context, _token) {
         this._view = webviewView.webview;
         webviewView.webview.options = {
             enableScripts: true,

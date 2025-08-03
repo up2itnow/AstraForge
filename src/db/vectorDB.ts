@@ -49,7 +49,7 @@ export class VectorDB {
     await this.save();
   }
 
-  async queryEmbedding(vector: number[], topK: number = 5): Promise<VectorItem[]> {
+  async queryEmbedding(vector: number[], topK: number = 5): Promise<(VectorItem & { similarity: number })[]> {
     // Simple cosine similarity implementation
     const similarities = this.items.map(item => ({
       item,
@@ -76,7 +76,7 @@ export class VectorDB {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
-  private async save() {
+  async save() {
     const dataPath = path.join(this.storagePath, 'vectors.json');
     fs.writeFileSync(dataPath, JSON.stringify(this.items, null, 2));
   }

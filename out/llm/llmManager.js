@@ -137,7 +137,7 @@ class LLMManager {
                 const response = await this.queryLLM(i, votePrompt);
                 return { response, success: true };
             }
-            catch (error) {
+            catch (_error) {
                 return { response: options[0], success: false }; // Default to first option on error
             }
         });

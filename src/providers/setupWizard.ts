@@ -4,11 +4,13 @@ export class SetupWizardProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'astraforge.setupWizard';
   private _view?: vscode.Webview;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(private readonly _extensionUri: vscode.Uri) {
+    // Initialize setup wizard with extension URI
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
-    context: vscode.WebviewViewResolveContext,
+    _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ) {
     this._view = webviewView.webview;

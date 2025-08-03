@@ -191,7 +191,6 @@ export class WorkflowManager {
 
   private getCurrentWorkflowState(): any {
     const totalTime = Date.now() - this.metrics.startTime;
-    const phaseTime = Date.now() - this.metrics.phaseStartTime;
     
     return {
       currentPhase: this.phases[this.currentPhase],
@@ -322,13 +321,14 @@ export class WorkflowManager {
         feedback = 0.8;
         break;
         
-      case 'Apply suggestions':
+      case 'Apply suggestions': {
         feedback = 0.9;
         const improvedOutput = await this.llmManager.conference(`Apply these suggestions: ${suggestions} to improve: ${output}`);
         await this.writePhaseOutput(improvedOutput, `${phase}_improved`);
         break;
+      }
         
-      case 'Request modifications':
+      case 'Request modifications': {
         feedback = 0.5;
         const modification = await vscode.window.showInputBox({
           prompt: 'What modifications would you like?'
@@ -338,12 +338,14 @@ export class WorkflowManager {
           await this.writePhaseOutput(modifiedOutput, `${phase}_modified`);
         }
         break;
+      }
         
-      case 'Get more details':
+      case 'Get more details': {
         feedback = 0.6;
         const details = await this.llmManager.queryLLM(0, `Provide more detailed explanation for: ${output}`);
         vscode.window.showInformationMessage(`Details: ${details.substring(0, 200)}...`);
         break;
+      }
     }
     
     this.metrics.userFeedback.push(feedback);
