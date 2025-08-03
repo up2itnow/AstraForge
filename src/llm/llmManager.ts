@@ -102,36 +102,124 @@ export class LLMManager {
   }
 
   async voteOnDecision(prompt: string, options: string[]): Promise<string> {
+    if (this.panel.length === 0 || options.length === 0) {
+      return options[0] || 'No options provided';
+    }
+
     const votes: Map<string, number> = new Map(options.map(opt => [opt, 0]));
-    const responses = await Promise.all(this.panel.map((_, i) => this.queryLLM(i, `${prompt} Vote on: ${options.join(', ')}`)));
     
-    responses.forEach(resp => {
-      const voted = options.find(opt => resp.includes(opt));
-      if (voted) votes.set(voted, (votes.get(voted) || 0) + 1);
+    // Enhanced voting with better prompt formatting and parallel processing
+    const votePrompt = `${prompt}\n\nPlease vote on ONE of these options: ${options.join(', ')}\nRespond with ONLY the option you choose.`;
+    
+    const votePromises = this.panel.map(async (_, i) => {
+      try {
+        const response = await this.queryLLM(i, votePrompt);
+        return { response, success: true };
+      } catch (error) {
+        return { response: options[0], success: false }; // Default to first option on error
+      }
+    });
+
+    const results = await Promise.all(votePromises);
+    
+    // Process votes with fuzzy matching for better accuracy
+    results.forEach(result => {
+      const response = result.response.toLowerCase().trim();
+      const voted = options.find(opt => 
+        response.includes(opt.toLowerCase()) || 
+        opt.toLowerCase().includes(response) ||
+        this.calculateSimilarity(response, opt.toLowerCase()) > 0.7
+      );
+      if (voted) {
+        votes.set(voted, (votes.get(voted) || 0) + 1);
+      }
     });
     
-    // Find majority winner
+    // Find majority winner with tie-breaking
     let max = 0;
     let winner = options[0];
     votes.forEach((count, opt) => {
-      if (count > max) {
+      if (count > max || (count === max && opt === options[0])) {
         max = count;
         winner = opt;
       }
     });
     
-    // Log for audit
-    console.log(`Vote results: ${JSON.stringify(Array.from(votes))}`);
+    // Enhanced logging for audit trail
+    const voteResults = Array.from(votes.entries()).map(([option, count]) => ({ option, count }));
+    console.log(`Vote results for "${prompt.substring(0, 50)}...": ${JSON.stringify(voteResults)}, Winner: ${winner}`);
+    
     return winner;
   }
 
-  // Conference: Sequential prompting for discussion
-  async conference(prompt: string): Promise<string> {
-    let discussion = prompt;
-    for (let i = 0; i < this.panel.length; i++) {
-      const response = await this.queryLLM(i, discussion);
-      discussion += `\n\nLLM ${i+1} (${this.panel[i]?.role || 'unknown'}): ${response}`;
+  // Helper method for fuzzy string matching in voting
+  private calculateSimilarity(str1: string, str2: string): number {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = this.levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  }
+
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+    
+    for (let j = 1; j <= str2.length; j++) {
+      for (let i = 1; i <= str1.length; i++) {
+        const substitutionCost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1, // insertion
+          matrix[j - 1][i] + 1, // deletion
+          matrix[j - 1][i - 1] + substitutionCost // substitution
+        );
+      }
     }
+    
+    return matrix[str2.length][str1.length];
+  }
+
+  // Conference: Parallel prompting for discussion with async processing
+  async conference(prompt: string): Promise<string> {
+    if (this.panel.length === 0) {
+      return `${prompt}\n\nNo LLMs configured for conference.`;
+    }
+
+    // Start all LLM queries in parallel for better performance
+    const queryPromises = this.panel.map(async (config, i) => {
+      try {
+        const response = await this.queryLLM(i, prompt);
+        return {
+          index: i,
+          role: config.role || 'unknown',
+          response,
+          success: true
+        };
+      } catch (error: any) {
+        return {
+          index: i,
+          role: config.role || 'unknown',
+          response: `Error: ${error.message}`,
+          success: false
+        };
+      }
+    });
+
+    // Wait for all responses and build discussion
+    const results = await Promise.all(queryPromises);
+    let discussion = prompt;
+    
+    // Sort by index to maintain consistent order
+    results.sort((a, b) => a.index - b.index);
+    
+    for (const result of results) {
+      discussion += `\n\nLLM ${result.index + 1} (${result.role}): ${result.response}`;
+    }
+    
     return discussion;
   }
 }

@@ -36,10 +36,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.VectorDB = void 0;
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
+const inference_1 = require("@huggingface/inference");
 class VectorDB {
     constructor(storagePath) {
         this.items = [];
+        this.embeddingModel = 'sentence-transformers/all-MiniLM-L6-v2';
         this.storagePath = path.join(storagePath, 'vectordb');
+        // Initialize Hugging Face inference - will use public API or user's token if set
+        this.hf = new inference_1.HfInference(process.env.HUGGINGFACE_API_TOKEN);
     }
     async init() {
         // Ensure storage directory exists
@@ -98,12 +102,51 @@ class VectorDB {
     close() {
         // Cleanup if needed
     }
-    // Helper to get embedding (mock implementation for now)
+    // Real embedding implementation using Hugging Face
     async getEmbedding(text) {
-        // Simple hash-based mock embedding for development
-        // In production, this would call an actual embedding API
+        try {
+            // Clean and prepare text for embedding
+            const cleanText = text.replace(/\s+/g, ' ').trim();
+            if (!cleanText) {
+                console.warn('Empty text provided for embedding, using fallback');
+                return this.getFallbackEmbedding(text);
+            }
+            // Use Hugging Face inference for real embeddings
+            const response = await this.hf.featureExtraction({
+                model: this.embeddingModel,
+                inputs: cleanText
+            });
+            // Handle different response formats
+            let embedding;
+            if (Array.isArray(response)) {
+                if (Array.isArray(response[0])) {
+                    embedding = response[0];
+                }
+                else {
+                    embedding = response;
+                }
+            }
+            else {
+                throw new Error('Unexpected response format from embedding API');
+            }
+            // Validate embedding
+            if (!embedding || embedding.length === 0) {
+                console.warn('Invalid embedding received, using fallback');
+                return this.getFallbackEmbedding(text);
+            }
+            console.log(`Generated embedding for "${cleanText.substring(0, 50)}..." (${embedding.length} dimensions)`);
+            return embedding;
+        }
+        catch (error) {
+            console.warn(`Embedding API failed: ${error.message}, using fallback`);
+            return this.getFallbackEmbedding(text);
+        }
+    }
+    // Fallback embedding for when API is unavailable
+    getFallbackEmbedding(text) {
+        console.log('Using fallback embedding generation');
         const hash = this.simpleHash(text);
-        const embedding = new Array(384).fill(0); // Common embedding dimension
+        const embedding = new Array(384).fill(0); // Standard embedding dimension
         // Create a deterministic but distributed embedding based on text
         for (let i = 0; i < embedding.length; i++) {
             embedding[i] = Math.sin((hash + i) * 0.1) * Math.cos((hash + i) * 0.2);
@@ -118,6 +161,32 @@ class VectorDB {
             hash = hash & hash; // Convert to 32-bit integer
         }
         return Math.abs(hash);
+    }
+    // Batch embedding for efficiency
+    async getBatchEmbeddings(texts) {
+        const embeddings = [];
+        // Process in batches to avoid rate limits
+        const batchSize = 5;
+        for (let i = 0; i < texts.length; i += batchSize) {
+            const batch = texts.slice(i, i + batchSize);
+            const batchPromises = batch.map(text => this.getEmbedding(text));
+            try {
+                const batchResults = await Promise.all(batchPromises);
+                embeddings.push(...batchResults);
+                // Small delay to respect rate limits
+                if (i + batchSize < texts.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+            catch (error) {
+                console.warn(`Batch embedding failed: ${error.message}`);
+                // Add fallback embeddings for failed batch
+                for (const text of batch) {
+                    embeddings.push(this.getFallbackEmbedding(text));
+                }
+            }
+        }
+        return embeddings;
     }
 }
 exports.VectorDB = VectorDB;
