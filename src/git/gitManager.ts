@@ -12,7 +12,7 @@ export class GitManager {
     try {
       // Check if git is already initialized
       await execAsync('git status', { cwd: path });
-    } catch (_error) {
+    } catch {
       // Git not initialized, initialize it
       try {
         await execAsync('git init', { cwd: path });

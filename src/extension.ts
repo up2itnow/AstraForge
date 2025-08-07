@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SetupWizardProvider } from './providers/setupWizard';
 import { ProjectIgnitionProvider } from './providers/projectIgnition';
+import { ApiTesterProvider } from './testing/apiTesterProvider';
 import { LLMManager } from './llm/llmManager';
 import { VectorDB } from './db/vectorDB';
 import { WorkflowManager } from './workflow/workflowManager';
@@ -32,6 +33,11 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider('astraforge.projectIgnition', projectIgnition)
   );
 
+  const apiTester = new ApiTesterProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('astraforge.apiTester', apiTester)
+  );
+
   // Commands
   context.subscriptions.push(
     vscode.commands.registerCommand('astraforge.setupPanel', async () => {
@@ -49,6 +55,13 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('astraforge.proceedPhase', () => {
       workflowManager.proceedToNextPhase();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('astraforge.testAPIs', async () => {
+      await vscode.commands.executeCommand('workbench.action.focusSideBar');
+      await vscode.commands.executeCommand('workbench.view.extension.astraforge-activitybar');
     })
   );
 

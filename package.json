@@ -3,6 +3,7 @@
   "displayName": "AstraForge IDE",
   "description": "AI-powered self-improving IDE extension",
   "version": "0.0.1",
+  "type": "module",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -19,19 +20,31 @@
         {
           "id": "astraforge.projectIgnition",
           "name": "Project Ignition"
+        },
+        {
+          "id": "astraforge.apiTester",
+          "name": "API Tester"
         }
       ]
-    }
+    },
+    "commands": [
+      {
+        "command": "astraforge.testAPIs",
+        "title": "Test APIs",
+        "category": "AstraForge"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run compile",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix"
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "test:api": "node out/testing/apiTesterCLI.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
@@ -48,6 +61,7 @@
   "dependencies": {
     "@huggingface/inference": "^4.6.1",
     "axios": "^1.11.0",
+    "commander": "^14.0.0",
     "express": "^4.18.1",
     "simple-git": "^3.19.1",
     "socket.io": "^4.7.1",

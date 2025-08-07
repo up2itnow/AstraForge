@@ -1,11 +1,8 @@
-"use strict";
 /**
  * Reinforcement Learning module for adaptive workflow optimization
  * Uses Q-learning to optimize phase sequencing and decision making
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.AdaptiveWorkflowRL = void 0;
-class AdaptiveWorkflowRL {
+export class AdaptiveWorkflowRL {
     constructor() {
         this.qTable = new Map();
         this.learningRate = 0.1;
@@ -228,5 +225,4 @@ class AdaptiveWorkflowRL {
         };
     }
 }
-exports.AdaptiveWorkflowRL = AdaptiveWorkflowRL;
 //# sourceMappingURL=adaptiveWorkflow.js.map

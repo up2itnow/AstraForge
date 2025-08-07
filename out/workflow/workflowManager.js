@@ -1,44 +1,8 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WorkflowManager = void 0;
-const vscode = __importStar(require("vscode"));
-const adaptiveWorkflow_1 = require("../rl/adaptiveWorkflow");
-const collaborationServer_1 = require("../server/collaborationServer");
-const path = __importStar(require("path"));
-class WorkflowManager {
+import * as vscode from 'vscode';
+import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
+import { CollaborationServer } from '../server/collaborationServer';
+import * as path from 'path';
+export class WorkflowManager {
     constructor(llmManager, vectorDB, gitManager) {
         this.llmManager = llmManager;
         this.vectorDB = vectorDB;
@@ -47,7 +11,8 @@ class WorkflowManager {
         this.phases = ['Planning', 'Prototyping', 'Testing', 'Deployment'];
         this.projectIdea = '';
         this.buildPlan = '';
-        this.workflowRL = new adaptiveWorkflow_1.AdaptiveWorkflowRL();
+        // These parameters are used throughout the class methods
+        this.workflowRL = new AdaptiveWorkflowRL();
         this.workspaceId = `workspace_${Date.now()}`;
         this.metrics = {
             startTime: Date.now(),
@@ -162,7 +127,7 @@ class WorkflowManager {
     // Supporting methods for enhanced workflow
     async initializeCollaboration() {
         try {
-            this.collaborationServer = new collaborationServer_1.CollaborationServer(3001);
+            this.collaborationServer = new CollaborationServer(3001);
             await this.collaborationServer.start();
             console.log('Collaboration server initialized');
         }
@@ -390,5 +355,4 @@ ${bonuses}
         }
     }
 }
-exports.WorkflowManager = WorkflowManager;
 //# sourceMappingURL=workflowManager.js.map

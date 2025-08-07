@@ -29,6 +29,7 @@ export class WorkflowManager {
     private vectorDB: VectorDB,
     private gitManager: GitManager
   ) {
+    // These parameters are used throughout the class methods
     this.workflowRL = new AdaptiveWorkflowRL();
     this.workspaceId = `workspace_${Date.now()}`;
     this.metrics = {

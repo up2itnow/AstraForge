@@ -6,6 +6,7 @@ export class SetupWizardProvider implements vscode.WebviewViewProvider {
 
   constructor(private readonly _extensionUri: vscode.Uri) {
     // Initialize setup wizard with extension URI
+    // _extensionUri is used in _getHtmlForWebview method
   }
 
   public resolveWebviewView(
@@ -13,6 +14,7 @@ export class SetupWizardProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ) {
+    // _context and _token are required by interface but not used in this implementation
     this._view = webviewView.webview;
 
     webviewView.webview.options = {

@@ -10,6 +10,7 @@ export class ProjectIgnitionProvider implements vscode.WebviewViewProvider {
     private readonly _workflowManager: WorkflowManager
   ) {
     // Initialize provider with extension URI and workflow manager
+    // These parameters are used in the class methods
   }
 
   public resolveWebviewView(
@@ -17,6 +18,7 @@ export class ProjectIgnitionProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ) {
+    // _context and _token are required by interface but not used in this implementation
     this._view = webviewView.webview;
 
     webviewView.webview.options = {

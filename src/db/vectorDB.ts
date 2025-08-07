@@ -57,7 +57,7 @@ export class VectorDB {
     }));
     
     similarities.sort((a, b) => b.similarity - a.similarity);
-    return similarities.slice(0, topK).map(s => s.item);
+    return similarities.slice(0, topK).map(s => ({ ...s.item, similarity: s.similarity }));
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {
