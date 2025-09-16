@@ -31,18 +31,18 @@ const DEFAULT_PROMPT_OPTIONS: ValidationOptions = {
   minLength: 1,
   allowHtml: false,
   allowScripts: false,
-  customPatterns: []
+  customPatterns: [],
 };
 
 /**
  * Sanitize and validate user input for LLM consumption
- * 
+ *
  * @param input - The user input to validate
  * @param options - Validation options
  * @returns Validation result with sanitized input
  */
 export function validateLLMInput(
-  input: string, 
+  input: string,
   options: ValidationOptions = DEFAULT_PROMPT_OPTIONS
 ): ValidationResult {
   const errors: string[] = [];
@@ -52,7 +52,7 @@ export function validateLLMInput(
   if (!input || typeof input !== 'string') {
     return {
       isValid: false,
-      errors: ['Input must be a non-empty string']
+      errors: ['Input must be a non-empty string'],
     };
   }
 
@@ -84,7 +84,7 @@ export function validateLLMInput(
     /system\s*:/gi,
     /(?:ignore|disregard|forget).*(?:instructions|prompt|rules)/gi,
     /(?:act|pretend|roleplay)\s+as/gi,
-    /(?:you\s+are|you're)\s+(?:now|a)/gi
+    /(?:you\s+are|you're)\s+(?:now|a)/gi,
   ];
 
   for (const pattern of suspiciousPatterns) {
@@ -106,10 +106,10 @@ export function validateLLMInput(
 
   // Check for potential injection attempts
   const injectionPatterns = [
-    /\${.*}/g,  // Template literals
-    /<%.*%>/g,  // Template tags
-    /{{.*}}/g,  // Handlebars/Mustache
-    /\[\[.*\]\]/g  // Wiki/Markdown links that could be exploited
+    /\${.*}/g, // Template literals
+    /<%.*%>/g, // Template tags
+    /{{.*}}/g, // Handlebars/Mustache
+    /\[\[.*\]\]/g, // Wiki/Markdown links that could be exploited
   ];
 
   for (const pattern of injectionPatterns) {
@@ -122,13 +122,13 @@ export function validateLLMInput(
   return {
     isValid: errors.length === 0,
     errors,
-    sanitized: errors.length === 0 ? sanitized.trim() : undefined
+    sanitized: errors.length === 0 ? sanitized.trim() : undefined,
   };
 }
 
 /**
  * Validate API key format
- * 
+ *
  * @param apiKey - The API key to validate
  * @param provider - The provider name for specific validation rules
  * @returns Validation result
@@ -139,7 +139,7 @@ export function validateApiKey(apiKey: string, provider: string): ValidationResu
   if (!apiKey || typeof apiKey !== 'string') {
     return {
       isValid: false,
-      errors: ['API key must be a non-empty string']
+      errors: ['API key must be a non-empty string'],
     };
   }
 
@@ -189,13 +189,13 @@ export function validateApiKey(apiKey: string, provider: string): ValidationResu
   return {
     isValid: errors.length === 0,
     errors,
-    sanitized: errors.length === 0 ? cleanKey : undefined
+    sanitized: errors.length === 0 ? cleanKey : undefined,
   };
 }
 
 /**
  * Validate project idea input
- * 
+ *
  * @param idea - The project idea to validate
  * @returns Validation result
  */
@@ -204,24 +204,24 @@ export function validateProjectIdea(idea: string): ValidationResult {
     maxLength: 5000,
     minLength: 10,
     allowHtml: false,
-    allowScripts: false
+    allowScripts: false,
   });
 }
 
 /**
  * Validate file content before processing
- * 
+ *
  * @param content - File content to validate
  * @param filename - Optional filename for context
  * @returns Validation result
  */
 export function validateFileContent(content: string, filename?: string): ValidationResult {
   const errors: string[] = [];
-  
+
   if (!content || typeof content !== 'string') {
     return {
       isValid: false,
-      errors: ['File content must be a string']
+      errors: ['File content must be a string'],
     };
   }
 
@@ -239,7 +239,7 @@ export function validateFileContent(content: string, filename?: string): Validat
   if (filename) {
     const dangerousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.com'];
     const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
-    
+
     if (dangerousExtensions.includes(ext)) {
       errors.push('File type not allowed');
     }
@@ -248,6 +248,6 @@ export function validateFileContent(content: string, filename?: string): Validat
   return {
     isValid: errors.length === 0,
     errors,
-    sanitized: errors.length === 0 ? content : undefined
+    sanitized: errors.length === 0 ? content : undefined,
   };
 }

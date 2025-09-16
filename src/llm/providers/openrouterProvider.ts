@@ -10,7 +10,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
 
   async query(prompt: string, config: LLMConfig): Promise<LLMResponse> {
     const sanitizedPrompt = this.sanitizePrompt(prompt);
-    
+
     const response = await this.makeRequest(
       `${this.baseUrl}/chat/completions`,
       {
@@ -20,7 +20,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
         temperature: config.temperature || 0.7,
       },
       {
-        'Authorization': `Bearer ${config.key}`,
+        Authorization: `Bearer ${config.key}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://github.com/up2itnow/AstraForge',
         'X-Title': 'AstraForge IDE',
@@ -39,14 +39,10 @@ export class OpenRouterProvider extends BaseLLMProvider {
 
   async validateConfig(config: LLMConfig): Promise<boolean> {
     try {
-      const response = await this.makeRequest(
-        `${this.baseUrl}/models`,
-        null,
-        {
-          'Authorization': `Bearer ${config.key}`,
-          'Content-Type': 'application/json',
-        }
-      );
+      const response = await this.makeRequest(`${this.baseUrl}/models`, null, {
+        Authorization: `Bearer ${config.key}`,
+        'Content-Type': 'application/json',
+      });
       return response.status === 200;
     } catch {
       return false;
@@ -55,15 +51,11 @@ export class OpenRouterProvider extends BaseLLMProvider {
 
   async getAvailableModels(config: LLMConfig): Promise<string[]> {
     try {
-      const response = await this.makeRequest(
-        `${this.baseUrl}/models`,
-        null,
-        {
-          'Authorization': `Bearer ${config.key}`,
-          'Content-Type': 'application/json',
-        }
-      );
-      
+      const response = await this.makeRequest(`${this.baseUrl}/models`, null, {
+        Authorization: `Bearer ${config.key}`,
+        'Content-Type': 'application/json',
+      });
+
       return response.data.data.map((model: any) => model.id).sort();
     } catch {
       return ['openai/gpt-4', 'anthropic/claude-3-sonnet']; // fallback

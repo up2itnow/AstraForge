@@ -18,7 +18,7 @@ export class LLMManager {
     this.panel = vscode.workspace.getConfiguration('astraforge').get('llmPanel', []);
     this.cache = new LLMCache(
       3600, // 1 hour TTL
-      60,   // 60 requests per minute
+      60, // 60 requests per minute
       60000 // 1 minute window
     );
     this.maxConcurrentRequests = vscode.workspace
@@ -71,19 +71,19 @@ export class LLMManager {
       }
 
       const response = await provider.query(prompt, config);
-      
+
       // Cache the response
       this.cache.set(prompt, config.provider, config.model, response.content, response.usage);
-      
+
       return response.content;
     } catch (error: any) {
       vscode.window.showErrorMessage(`LLM query failed: ${error.message}. Falling back...`);
-      
+
       // Fallback to primary LLM
       if (index !== 0) {
         return this.queryLLM(0, prompt);
       }
-      
+
       return `Error: ${error.message}`;
     }
   }
@@ -97,7 +97,7 @@ export class LLMManager {
     }
 
     const votes = new Map<string, number>(options.map(opt => [opt, 0]));
-    
+
     // Enhanced voting prompt
     const votePrompt = `${prompt}
 
@@ -116,21 +116,22 @@ Respond with ONLY the option you choose, exactly as written.`;
 
     // Execute with controlled concurrency
     const results = await this.executeWithConcurrencyLimit(votePromises);
-    
+
     // Process votes with fuzzy matching
     results.forEach(result => {
       const response = result.response.toLowerCase().trim();
-      const voted = options.find(opt => 
-        response.includes(opt.toLowerCase()) || 
-        opt.toLowerCase().includes(response) ||
-        this.calculateSimilarity(response, opt.toLowerCase()) > 0.7
+      const voted = options.find(
+        opt =>
+          response.includes(opt.toLowerCase()) ||
+          opt.toLowerCase().includes(response) ||
+          this.calculateSimilarity(response, opt.toLowerCase()) > 0.7
       );
-      
+
       if (voted) {
         votes.set(voted, (votes.get(voted) || 0) + 1);
       }
     });
-    
+
     // Find majority winner with tie-breaking
     let max = 0;
     let winner = options[0];
@@ -140,11 +141,13 @@ Respond with ONLY the option you choose, exactly as written.`;
         winner = opt;
       }
     });
-    
+
     // Enhanced logging for audit trail
     const voteResults = Array.from(votes.entries()).map(([option, count]) => ({ option, count }));
-    console.log(`Vote results for "${prompt.substring(0, 50)}...": ${JSON.stringify(voteResults)}, Winner: ${winner}`);
-    
+    console.log(
+      `Vote results for "${prompt.substring(0, 50)}...": ${JSON.stringify(voteResults)}, Winner: ${winner}`
+    );
+
     return winner;
   }
 
@@ -176,13 +179,13 @@ Respond with ONLY the option you choose, exactly as written.`;
    */
   async validateAllConfigurations(): Promise<Record<string, boolean>> {
     const results: Record<string, boolean> = {};
-    
+
     const validationPromises = this.panel.map(async (config, index) => {
       const provider = this.providers.get(config.provider);
       if (!provider) {
         return { index, valid: false };
       }
-      
+
       try {
         const valid = await provider.validateConfig(config);
         return { index, valid };
@@ -192,7 +195,7 @@ Respond with ONLY the option you choose, exactly as written.`;
     });
 
     const validationResults = await Promise.all(validationPromises);
-    
+
     validationResults.forEach(result => {
       const config = this.panel[result.index];
       results[`${config.provider}-${result.index}`] = result.valid;
@@ -206,7 +209,7 @@ Respond with ONLY the option you choose, exactly as written.`;
    */
   async getAvailableModels(): Promise<Record<string, string[]>> {
     const models: Record<string, string[]> = {};
-    
+
     for (const [providerName, provider] of this.providers.entries()) {
       const config = this.panel.find(c => c.provider === providerName);
       if (config) {
@@ -252,7 +255,7 @@ Respond with ONLY the option you choose, exactly as written.`;
   private calculateSimilarity(str1: string, str2: string): number {
     const maxLength = Math.max(str1.length, str2.length);
     if (maxLength === 0) return 1;
-    
+
     const distance = this.levenshteinDistance(str1, str2);
     return (maxLength - distance) / maxLength;
   }
@@ -261,7 +264,9 @@ Respond with ONLY the option you choose, exactly as written.`;
    * Calculate Levenshtein distance between two strings
    */
   private levenshteinDistance(str1: string, str2: string): number {
-    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    const matrix = Array(str2.length + 1)
+      .fill(null)
+      .map(() => Array(str1.length + 1).fill(null));
 
     for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
     for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;

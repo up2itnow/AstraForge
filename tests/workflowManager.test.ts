@@ -21,21 +21,21 @@ jest.mock('vscode', () => ({
     workspaceFolders: [{ uri: { fsPath: '/test/workspace' } }],
     fs: {
       createDirectory: jest.fn(),
-      writeFile: jest.fn()
+      writeFile: jest.fn(),
     },
     openTextDocument: jest.fn(),
-    getConfiguration: jest.fn(() => ({ get: jest.fn() }))
+    getConfiguration: jest.fn(() => ({ get: jest.fn() })),
   },
   window: {
     showInformationMessage: jest.fn(),
     showErrorMessage: jest.fn(),
     showQuickPick: jest.fn(),
     showInputBox: jest.fn(),
-    showTextDocument: jest.fn()
+    showTextDocument: jest.fn(),
   },
   Uri: {
-    file: jest.fn((path: string) => ({ fsPath: path }))
-  }
+    file: jest.fn((path: string) => ({ fsPath: path })),
+  },
 }));
 
 const mockLLMManager = LLMManager as jest.MockedClass<typeof LLMManager>;
@@ -55,18 +55,18 @@ describe('WorkflowManager', () => {
     mockLLM = {
       conference: jest.fn(),
       queryLLM: jest.fn(),
-      voteOnDecision: jest.fn()
+      voteOnDecision: jest.fn(),
     } as any;
 
     mockVector = {
       init: jest.fn(),
       getEmbedding: jest.fn(),
       queryEmbedding: jest.fn(),
-      addEmbedding: jest.fn()
+      addEmbedding: jest.fn(),
     } as any;
 
     mockGit = {
-      commit: jest.fn()
+      commit: jest.fn(),
     } as any;
 
     mockLLMManager.mockImplementation(() => mockLLM);
@@ -100,7 +100,7 @@ describe('WorkflowManager', () => {
 
     it('should start workflow with project idea', async () => {
       const testIdea = 'Build a todo app';
-      
+
       await workflowManager.startWorkflow(testIdea);
 
       expect(mockLLM.conference).toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe('WorkflowManager', () => {
 
     it('should handle "letPanelDecide" option', async () => {
       const testIdea = 'Build a todo app';
-      
+
       await workflowManager.startWorkflow(testIdea, 'letPanelDecide');
 
       // Should call conference to refine the idea
@@ -120,7 +120,7 @@ describe('WorkflowManager', () => {
 
     it('should execute phases sequentially', async () => {
       const testIdea = 'Build a todo app';
-      
+
       // Mock user interaction
       (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('Proceed as planned');
       (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
@@ -138,7 +138,7 @@ describe('WorkflowManager', () => {
     beforeEach(() => {
       mockVector.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
       mockVector.queryEmbedding.mockResolvedValue([
-        { id: 'test1', similarity: 0.9, metadata: { plan: 'Previous plan data' } }
+        { id: 'test1', similarity: 0.9, metadata: { plan: 'Previous plan data' } },
       ]);
       mockLLM.conference.mockResolvedValue('Phase execution result');
       mockLLM.queryLLM.mockResolvedValue('Review result');
@@ -147,7 +147,7 @@ describe('WorkflowManager', () => {
 
     it('should retrieve relevant context from vector DB', async () => {
       await workflowManager.startWorkflow('Test project');
-      
+
       expect(mockVector.getEmbedding).toHaveBeenCalledWith(
         expect.stringContaining('Planning for Test project')
       );
@@ -156,7 +156,7 @@ describe('WorkflowManager', () => {
 
     it('should generate enhanced prompts with context', async () => {
       await workflowManager.startWorkflow('Test project');
-      
+
       expect(mockLLM.conference).toHaveBeenCalledWith(
         expect.stringContaining('Previous plan data')
       );
@@ -168,7 +168,7 @@ describe('WorkflowManager', () => {
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalled();
       expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
         expect.objectContaining({
-          fsPath: expect.stringContaining('astraforge_output')
+          fsPath: expect.stringContaining('astraforge_output'),
         }),
         expect.any(Object)
       );
@@ -177,9 +177,7 @@ describe('WorkflowManager', () => {
     it('should commit changes with detailed messages', async () => {
       await workflowManager.startWorkflow('Test project');
 
-      expect(mockGit.commit).toHaveBeenCalledWith(
-        expect.stringContaining('Planning complete')
-      );
+      expect(mockGit.commit).toHaveBeenCalledWith(expect.stringContaining('Planning complete'));
     });
 
     it('should store phase context in vector DB', async () => {
@@ -190,7 +188,7 @@ describe('WorkflowManager', () => {
         expect.any(Array),
         expect.objectContaining({
           phase: expect.any(String),
-          content: expect.any(String)
+          content: expect.any(String),
         })
       );
     });
@@ -206,7 +204,7 @@ describe('WorkflowManager', () => {
 
     it('should handle "Apply suggestions" user choice', async () => {
       (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('Apply suggestions');
-      
+
       await workflowManager.startWorkflow('Test project');
 
       expect(mockLLM.conference).toHaveBeenCalledWith(
@@ -217,7 +215,7 @@ describe('WorkflowManager', () => {
     it('should handle "Request modifications" user choice', async () => {
       (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('Request modifications');
       (vscode.window.showInputBox as jest.Mock).mockResolvedValue('Make it better');
-      
+
       await workflowManager.startWorkflow('Test project');
 
       expect(vscode.window.showInputBox).toHaveBeenCalled();
@@ -228,7 +226,7 @@ describe('WorkflowManager', () => {
 
     it('should handle "Get more details" user choice', async () => {
       (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('Get more details');
-      
+
       await workflowManager.startWorkflow('Test project');
 
       expect(mockLLM.queryLLM).toHaveBeenCalledWith(
@@ -269,9 +267,7 @@ describe('WorkflowManager', () => {
 
       await workflowManager.startWorkflow('Test project');
 
-      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
-        'Workflow aborted by user'
-      );
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('Workflow aborted by user');
     });
   });
 
@@ -288,7 +284,7 @@ describe('WorkflowManager', () => {
       // Simulate completing all phases
       const manager = workflowManager as any;
       manager.currentPhase = 4; // Beyond all phases
-      
+
       await manager.completeProject();
 
       expect(mockLLM.queryLLM).toHaveBeenCalledWith(
@@ -304,15 +300,15 @@ describe('WorkflowManager', () => {
     it('should include AI learning metrics in final report', async () => {
       const manager = workflowManager as any;
       manager.currentPhase = 4;
-      
+
       await manager.completeProject();
 
       expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
         expect.objectContaining({
-          fsPath: expect.stringContaining('FINAL_REPORT.md')
+          fsPath: expect.stringContaining('FINAL_REPORT.md'),
         }),
         expect.objectContaining({
-          toString: expect.any(Function)
+          toString: expect.any(Function),
         })
       );
     });
@@ -320,7 +316,7 @@ describe('WorkflowManager', () => {
     it('should open final report for user review', async () => {
       const manager = workflowManager as any;
       manager.currentPhase = 4;
-      
+
       await manager.completeProject();
 
       expect(vscode.workspace.openTextDocument).toHaveBeenCalled();
@@ -336,7 +332,9 @@ describe('WorkflowManager', () => {
         getBestAction: jest.fn().mockReturnValue({ type: 'skip', confidence: 0.9 }),
         updateQValue: jest.fn(),
         calculateReward: jest.fn().mockReturnValue(0.8),
-        getStats: jest.fn().mockReturnValue({ totalStates: 5, totalActions: 10, explorationRate: 0.05 })
+        getStats: jest
+          .fn()
+          .mockReturnValue({ totalStates: 5, totalActions: 10, explorationRate: 0.05 }),
       };
 
       await workflowManager.startWorkflow('Test project');
@@ -350,7 +348,9 @@ describe('WorkflowManager', () => {
         getBestAction: jest.fn().mockReturnValue({ type: 'continue', confidence: 1.0 }),
         updateQValue: jest.fn(),
         calculateReward: jest.fn().mockReturnValue(0.8),
-        getStats: jest.fn().mockReturnValue({ totalStates: 1, totalActions: 1, explorationRate: 0.1 })
+        getStats: jest
+          .fn()
+          .mockReturnValue({ totalStates: 1, totalActions: 1, explorationRate: 0.1 }),
       };
 
       (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('Proceed as planned');
@@ -366,7 +366,7 @@ describe('WorkflowManager', () => {
     it('should broadcast phase events to collaboration server', async () => {
       const manager = workflowManager as any;
       manager.collaborationServer = {
-        broadcastToWorkspace: jest.fn()
+        broadcastToWorkspace: jest.fn(),
       };
 
       await workflowManager.startWorkflow('Test project');
@@ -376,7 +376,7 @@ describe('WorkflowManager', () => {
         'phase_started',
         expect.objectContaining({
           phase: 'Planning',
-          projectIdea: 'Test project'
+          projectIdea: 'Test project',
         })
       );
     });
@@ -385,7 +385,7 @@ describe('WorkflowManager', () => {
       const manager = workflowManager as any;
       manager.currentPhase = 4;
       manager.collaborationServer = {
-        broadcastToWorkspace: jest.fn()
+        broadcastToWorkspace: jest.fn(),
       };
 
       await manager.completeProject();
@@ -395,7 +395,7 @@ describe('WorkflowManager', () => {
         'project_completed',
         expect.objectContaining({
           projectIdea: expect.any(String),
-          metrics: expect.any(Object)
+          metrics: expect.any(Object),
         })
       );
     });
@@ -420,7 +420,8 @@ describe('WorkflowManager', () => {
 
     it('should estimate project complexity from keywords', async () => {
       const manager = workflowManager as any;
-      manager.projectIdea = 'Build a real-time machine learning API with authentication and database';
+      manager.projectIdea =
+        'Build a real-time machine learning API with authentication and database';
 
       const complexity = manager.estimateProjectComplexity();
       expect(complexity).toBeGreaterThan(0.5); // Should detect high complexity

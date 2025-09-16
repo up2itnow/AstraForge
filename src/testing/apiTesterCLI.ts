@@ -32,10 +32,10 @@ class ApiTesterCLI {
     prompt: string
   ): Promise<TestResult> {
     const startTime = Date.now();
-    
+
     try {
       let response: string;
-      
+
       switch (provider) {
         case 'OpenAI':
           response = await this.queryOpenAI(apiKey, model, prompt);
@@ -52,16 +52,16 @@ class ApiTesterCLI {
         default:
           throw new Error(`Unsupported provider: ${provider}`);
       }
-      
+
       const latency = Date.now() - startTime;
-      
+
       return {
         success: true,
         response,
         latency,
         timestamp: Date.now(),
         provider,
-        model
+        model,
       };
     } catch (error: any) {
       const latency = Date.now() - startTime;
@@ -71,65 +71,81 @@ class ApiTesterCLI {
         latency,
         timestamp: Date.now(),
         provider,
-        model
+        model,
       };
     }
   }
 
   private async queryOpenAI(apiKey: string, model: string, prompt: string): Promise<string> {
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1000
-    }, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1000,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
       }
-    });
+    );
     return response.data.choices[0].message.content;
   }
 
   private async queryAnthropic(apiKey: string, model: string, prompt: string): Promise<string> {
-    const response = await axios.post('https://api.anthropic.com/v1/messages', {
-      model,
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }]
-    }, {
-      headers: {
-        'x-api-key': apiKey,
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01'
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model,
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      },
+      {
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+        },
       }
-    });
+    );
     return response.data.content[0].text;
   }
 
   private async queryXAI(apiKey: string, model: string, prompt: string): Promise<string> {
-    const response = await axios.post('https://api.x.ai/v1/chat/completions', {
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1000
-    }, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+    const response = await axios.post(
+      'https://api.x.ai/v1/chat/completions',
+      {
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1000,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
       }
-    });
+    );
     return response.data.choices[0].message.content;
   }
 
   private async queryOpenRouter(apiKey: string, model: string, prompt: string): Promise<string> {
-    const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1000
-    }, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+    const response = await axios.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1000,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
       }
-    });
+    );
     return response.data.choices[0].message.content;
   }
 
@@ -140,7 +156,7 @@ class ApiTesterCLI {
     prompts: string[]
   ): Promise<BatchTestResult> {
     const startTime = Date.now();
-    
+
     // Process prompts in parallel for better performance
     const testPromises = prompts.map(async (prompt, index) => {
       const result = await this.testLLM(provider, apiKey, model, prompt);
@@ -149,10 +165,11 @@ class ApiTesterCLI {
 
     const batchResults = await Promise.all(testPromises);
     const totalTime = Date.now() - startTime;
-    
+
     const successful = batchResults.filter(r => r.success).length;
     const failed = batchResults.length - successful;
-    const averageLatency = batchResults.reduce((sum, r) => sum + r.latency, 0) / batchResults.length;
+    const averageLatency =
+      batchResults.reduce((sum, r) => sum + r.latency, 0) / batchResults.length;
 
     return {
       total: batchResults.length,
@@ -160,7 +177,7 @@ class ApiTesterCLI {
       failed,
       results: batchResults,
       averageLatency,
-      totalTime
+      totalTime,
     };
   }
 
@@ -171,19 +188,19 @@ class ApiTesterCLI {
     model: string
   ): Promise<TestResult[]> {
     const results: TestResult[] = [];
-    
+
     // Simulate the workflow phases
     const phases = ['Planning', 'Prototyping', 'Testing', 'Deployment'];
-    
+
     for (const phase of phases) {
       const prompt = `Execute ${phase} for project: ${idea}. Provide a brief summary.`;
       const result = await this.testLLM(provider, apiKey, model, prompt);
       results.push({
         ...result,
-        response: `Phase: ${phase}\n${result.response || result.error}`
+        response: `Phase: ${phase}\n${result.response || result.error}`,
       });
     }
-    
+
     return results;
   }
 
@@ -191,15 +208,15 @@ class ApiTesterCLI {
     if (!apiKey || apiKey.trim().length === 0) {
       return false;
     }
-    
+
     // Basic validation patterns
     const patterns = {
-      'OpenAI': /^sk-[a-zA-Z0-9]{32,}$/,
-      'Anthropic': /^sk-ant-[a-zA-Z0-9]{32,}$/,
-      'xAI': /^xai-[a-zA-Z0-9]{32,}$/,
-      'OpenRouter': /^sk-or-[a-zA-Z0-9]{32,}$/
+      OpenAI: /^sk-[a-zA-Z0-9]{32,}$/,
+      Anthropic: /^sk-ant-[a-zA-Z0-9]{32,}$/,
+      xAI: /^xai-[a-zA-Z0-9]{32,}$/,
+      OpenRouter: /^sk-or-[a-zA-Z0-9]{32,}$/,
     };
-    
+
     const pattern = patterns[provider as keyof typeof patterns];
     return pattern ? pattern.test(apiKey) : apiKey.length > 10;
   }
@@ -210,12 +227,12 @@ class ApiTesterCLI {
 
   getSupportedModels(provider: string): string[] {
     const models = {
-      'OpenAI': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-      'Anthropic': ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
-      'xAI': ['grok-beta', 'grok-pro'],
-      'OpenRouter': ['gpt-4', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet']
+      OpenAI: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+      Anthropic: ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
+      xAI: ['grok-beta', 'grok-pro'],
+      OpenRouter: ['gpt-4', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet'],
     };
-    
+
     return models[provider as keyof typeof models] || [];
   }
 }
@@ -223,10 +240,7 @@ class ApiTesterCLI {
 const program = new Command();
 const tester = new ApiTesterCLI();
 
-program
-  .name('astraforge')
-  .description('AstraForge API Testing Interface')
-  .version('0.0.1');
+program.name('astraforge').description('AstraForge API Testing Interface').version('0.0.1');
 
 // LLM Testing Commands
 program
@@ -239,7 +253,7 @@ program
   .option('--file <file>', 'File containing prompts (one per line)')
   .option('--output <file>', 'Output file for results')
   .option('--workflow <idea>', 'Test workflow simulation')
-  .action(async (options) => {
+  .action(async options => {
     try {
       if (options.workflow) {
         await testWorkflow(options);
@@ -263,7 +277,7 @@ program
   .description('List supported providers and models')
   .option('--providers', 'List supported providers')
   .option('--models <provider>', 'List models for a provider')
-  .action((options) => {
+  .action(options => {
     if (options.providers) {
       const providers = tester.getSupportedProviders();
       console.log('Supported Providers:');
@@ -279,7 +293,7 @@ program
 
 async function testSingle(options: any) {
   console.log(`Testing ${options.api} with model ${options.model}...`);
-  
+
   if (!tester.validateApiKey(options.api, options.key)) {
     console.error('Error: Invalid API key format');
     process.exit(1);
@@ -295,7 +309,7 @@ async function testSingle(options: any) {
   const output = {
     type: 'single_test',
     timestamp: new Date().toISOString(),
-    result
+    result,
   };
 
   if (options.output) {
@@ -308,7 +322,7 @@ async function testSingle(options: any) {
 
 async function testBatchFromFile(options: any) {
   console.log(`Testing ${options.api} with prompts from ${options.file}...`);
-  
+
   if (!tester.validateApiKey(options.api, options.key)) {
     console.error('Error: Invalid API key format');
     process.exit(1);
@@ -319,7 +333,8 @@ async function testBatchFromFile(options: any) {
     process.exit(1);
   }
 
-  const prompts = fs.readFileSync(options.file, 'utf8')
+  const prompts = fs
+    .readFileSync(options.file, 'utf8')
     .split('\n')
     .map(line => line.trim())
     .filter(line => line.length > 0);
@@ -329,18 +344,13 @@ async function testBatchFromFile(options: any) {
     process.exit(1);
   }
 
-  const result = await tester.testBatchLLM(
-    options.api as any,
-    options.key,
-    options.model,
-    prompts
-  );
+  const result = await tester.testBatchLLM(options.api as any, options.key, options.model, prompts);
 
   const output = {
     type: 'batch_test',
     timestamp: new Date().toISOString(),
     file: options.file,
-    result
+    result,
   };
 
   if (options.output) {
@@ -353,7 +363,7 @@ async function testBatchFromFile(options: any) {
 
 async function testWorkflow(options: any) {
   console.log(`Testing workflow simulation for: ${options.workflow}`);
-  
+
   if (!tester.validateApiKey(options.api, options.key)) {
     console.error('Error: Invalid API key format');
     process.exit(1);
@@ -370,7 +380,7 @@ async function testWorkflow(options: any) {
     type: 'workflow_simulation',
     timestamp: new Date().toISOString(),
     idea: options.workflow,
-    results
+    results,
   };
 
   if (options.output) {

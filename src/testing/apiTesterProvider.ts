@@ -19,13 +19,13 @@ export class ApiTesterProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [this._extensionUri]
+      localResourceRoots: [this._extensionUri],
     };
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
     // Handle messages from the webview
-    webviewView.webview.onDidReceiveMessage(async (data) => {
+    webviewView.webview.onDidReceiveMessage(async data => {
       try {
         switch (data.type) {
           case 'initialize':
@@ -68,25 +68,20 @@ export class ApiTesterProvider implements vscode.WebviewViewProvider {
             console.warn('Unknown message type:', data.type);
         }
       } catch (error: any) {
-        this._sendMessage('error', { 
+        this._sendMessage('error', {
           message: error.message,
-          type: data.type 
+          type: data.type,
         });
       }
     });
   }
 
   private async _handleLLMTest(data: any) {
-    const result = await this._tester.testLLM(
-      data.provider,
-      data.apiKey,
-      data.model,
-      data.prompt
-    );
+    const result = await this._tester.testLLM(data.provider, data.apiKey, data.model, data.prompt);
 
     this._sendMessage('llmTestResult', {
       result,
-      requestId: data.requestId
+      requestId: data.requestId,
     });
   }
 
@@ -100,19 +95,16 @@ export class ApiTesterProvider implements vscode.WebviewViewProvider {
 
     this._sendMessage('batchTestResult', {
       result,
-      requestId: data.requestId
+      requestId: data.requestId,
     });
   }
 
   private async _handleVectorTest(data: any) {
-    const result = await this._tester.testVectorQuery(
-      data.query,
-      data.topK || 5
-    );
+    const result = await this._tester.testVectorQuery(data.query, data.topK || 5);
 
     this._sendMessage('vectorTestResult', {
       result,
-      requestId: data.requestId
+      requestId: data.requestId,
     });
   }
 
@@ -126,7 +118,7 @@ export class ApiTesterProvider implements vscode.WebviewViewProvider {
 
     this._sendMessage('workflowTestResult', {
       results,
-      requestId: data.requestId
+      requestId: data.requestId,
     });
   }
 
@@ -137,8 +129,12 @@ export class ApiTesterProvider implements vscode.WebviewViewProvider {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'apiTester.js'));
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'styles.css'));
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, 'media', 'apiTester.js')
+    );
+    const styleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, 'media', 'styles.css')
+    );
 
     return `<!DOCTYPE html>
 <html lang="en">

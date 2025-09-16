@@ -216,7 +216,9 @@ Respond with ONLY the option you choose, exactly as written.`;
      * Calculate Levenshtein distance between two strings
      */
     levenshteinDistance(str1, str2) {
-        const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+        const matrix = Array(str2.length + 1)
+            .fill(null)
+            .map(() => Array(str1.length + 1).fill(null));
         for (let i = 0; i <= str1.length; i++)
             matrix[0][i] = i;
         for (let j = 0; j <= str2.length; j++)

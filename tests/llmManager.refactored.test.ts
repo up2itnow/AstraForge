@@ -13,34 +13,34 @@ jest.mock('vscode', () => ({
       get: jest.fn((key: string) => {
         if (key === 'llmPanel') {
           return [
-            { 
-              provider: 'OpenAI', 
-              key: 'test-openai-key', 
-              model: 'gpt-4', 
+            {
+              provider: 'OpenAI',
+              key: 'test-openai-key',
+              model: 'gpt-4',
               role: 'primary',
               maxTokens: 1000,
-              temperature: 0.7
+              temperature: 0.7,
             },
-            { 
-              provider: 'Anthropic', 
-              key: 'test-anthropic-key', 
-              model: 'claude-3-sonnet-20240229', 
+            {
+              provider: 'Anthropic',
+              key: 'test-anthropic-key',
+              model: 'claude-3-sonnet-20240229',
               role: 'secondary',
               maxTokens: 1000,
-              temperature: 0.7
-            }
+              temperature: 0.7,
+            },
           ];
         }
         if (key === 'maxConcurrentRequests') {
           return 3;
         }
         return undefined;
-      })
-    }))
+      }),
+    })),
   },
   window: {
-    showErrorMessage: jest.fn()
-  }
+    showErrorMessage: jest.fn(),
+  },
 }));
 
 // Mock provider module
@@ -50,13 +50,18 @@ jest.mock('../src/llm/providers', () => ({
       query: jest.fn().mockResolvedValue({
         content: `Mock response from ${providerName}`,
         usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
-        metadata: { model: 'mock-model' }
+        metadata: { model: 'mock-model' },
       }),
       validateConfig: jest.fn().mockResolvedValue(true),
-      getAvailableModels: jest.fn().mockResolvedValue([`${providerName.toLowerCase()}-model-1`, `${providerName.toLowerCase()}-model-2`])
+      getAvailableModels: jest
+        .fn()
+        .mockResolvedValue([
+          `${providerName.toLowerCase()}-model-1`,
+          `${providerName.toLowerCase()}-model-2`,
+        ]),
     };
     return mockProvider;
-  })
+  }),
 }));
 
 // Mock cache module
@@ -66,8 +71,8 @@ jest.mock('../src/llm/cache', () => ({
     set: jest.fn(),
     isThrottled: jest.fn().mockReturnValue(false),
     getStats: jest.fn().mockReturnValue({ cacheSize: 0, throttleEntries: 0 }),
-    clear: jest.fn()
-  }))
+    clear: jest.fn(),
+  })),
 }));
 
 describe('LLMManager (Refactored)', () => {
@@ -119,7 +124,7 @@ describe('LLMManager (Refactored)', () => {
       // Create new manager to get fresh cache instance
       const newManager = new LLMManager();
       const result = await newManager.queryLLM(0, 'Test prompt');
-      
+
       expect(result).toBe('Mock response from OpenAI'); // Since we're mocking, this will still be the mock response
     });
 
@@ -137,7 +142,7 @@ describe('LLMManager (Refactored)', () => {
     it('should conduct parallel voting with multiple LLMs', async () => {
       const options = ['Option A', 'Option B', 'Option C'];
       const result = await llmManager.voteOnDecision('Choose the best option', options);
-      
+
       expect(result).toBe('Option A'); // Should return first option due to tie-breaking
     });
 
@@ -149,7 +154,7 @@ describe('LLMManager (Refactored)', () => {
     it('should return first option when no LLMs configured', async () => {
       // Mock empty panel
       (vscode.workspace.getConfiguration as jest.Mock).mockReturnValueOnce({
-        get: jest.fn().mockReturnValue([])
+        get: jest.fn().mockReturnValue([]),
       });
 
       const newManager = new LLMManager();
@@ -161,7 +166,7 @@ describe('LLMManager (Refactored)', () => {
   describe('conference', () => {
     it('should create discussion with all LLMs', async () => {
       const result = await llmManager.conference('Discuss project architecture');
-      
+
       expect(result).toContain('Discuss project architecture');
       expect(result).toContain('LLM 1 (primary - OpenAI): Mock response from OpenAI');
       expect(result).toContain('LLM 2 (secondary - Anthropic): Mock response from Anthropic');
@@ -169,7 +174,7 @@ describe('LLMManager (Refactored)', () => {
 
     it('should handle empty LLM panel', async () => {
       (vscode.workspace.getConfiguration as jest.Mock).mockReturnValueOnce({
-        get: jest.fn().mockReturnValue([])
+        get: jest.fn().mockReturnValue([]),
       });
 
       const newManager = new LLMManager();
@@ -181,7 +186,7 @@ describe('LLMManager (Refactored)', () => {
   describe('validateAllConfigurations', () => {
     it('should validate all configured providers', async () => {
       const results = await llmManager.validateAllConfigurations();
-      
+
       expect(results).toHaveProperty('OpenAI-0', true);
       expect(results).toHaveProperty('Anthropic-1', true);
     });
@@ -199,7 +204,7 @@ describe('LLMManager (Refactored)', () => {
   describe('getAvailableModels', () => {
     it('should retrieve models from all providers', async () => {
       const models = await llmManager.getAvailableModels();
-      
+
       expect(models).toHaveProperty('OpenAI');
       expect(models).toHaveProperty('Anthropic');
       expect(models.OpenAI).toContain('openai-model-1');
@@ -217,7 +222,7 @@ describe('LLMManager (Refactored)', () => {
     it('should clear cache', () => {
       const { LLMCache } = require('../src/llm/cache');
       const mockCache = new LLMCache();
-      
+
       llmManager.clearCache();
       expect(mockCache.clear).toHaveBeenCalled();
     });
@@ -225,10 +230,8 @@ describe('LLMManager (Refactored)', () => {
 
   describe('Concurrency Control', () => {
     it('should respect concurrent request limits', async () => {
-      const promises = Array.from({ length: 5 }, (_, i) => 
-        llmManager.queryLLM(0, `Prompt ${i}`)
-      );
-      
+      const promises = Array.from({ length: 5 }, (_, i) => llmManager.queryLLM(0, `Prompt ${i}`));
+
       const results = await Promise.all(promises);
       expect(results).toHaveLength(5);
       results.forEach(result => {

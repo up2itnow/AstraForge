@@ -10,7 +10,7 @@ export class AnthropicProvider extends BaseLLMProvider {
 
   async query(prompt: string, config: LLMConfig): Promise<LLMResponse> {
     const sanitizedPrompt = this.sanitizePrompt(prompt);
-    
+
     const response = await this.makeRequest(
       `${this.baseUrl}/messages`,
       {

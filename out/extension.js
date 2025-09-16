@@ -44,7 +44,7 @@ async function registerProviders(context) {
         resolveWebviewView: async (webviewView, context, token) => {
             const provider = await getProjectIgnition();
             return provider.resolveWebviewView(webviewView, context, token);
-        }
+        },
     }));
 }
 /**
@@ -129,11 +129,7 @@ async function ensureGitManager() {
  */
 async function ensureWorkflowManager(context) {
     if (!workflowManager) {
-        await Promise.all([
-            ensureLLMManager(),
-            ensureVectorDB(context),
-            ensureGitManager()
-        ]);
+        await Promise.all([ensureLLMManager(), ensureVectorDB(context), ensureGitManager()]);
         const { WorkflowManager } = await import('./workflow/workflowManager');
         workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
     }

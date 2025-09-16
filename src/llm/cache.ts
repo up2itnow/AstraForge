@@ -114,7 +114,7 @@ export class LLMCache {
    */
   private cleanup(): void {
     const now = Date.now();
-    
+
     // Clean cache
     for (const [key, entry] of this.cache.entries()) {
       if (now - entry.timestamp > this.ttl) {

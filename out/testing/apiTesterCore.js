@@ -23,7 +23,7 @@ export class ApiTesterCore {
                 provider,
                 key: apiKey,
                 model,
-                role: 'primary'
+                role: 'primary',
             };
             // Temporarily set the panel for testing
             this.llmManager.panel = [testConfig];
@@ -35,7 +35,7 @@ export class ApiTesterCore {
                 latency,
                 timestamp: Date.now(),
                 provider,
-                model
+                model,
             };
         }
         catch (error) {
@@ -46,7 +46,7 @@ export class ApiTesterCore {
                 latency,
                 timestamp: Date.now(),
                 provider,
-                model
+                model,
             };
         }
     }
@@ -69,7 +69,7 @@ export class ApiTesterCore {
             failed,
             results: batchResults,
             averageLatency,
-            totalTime
+            totalTime,
         };
     }
     async testVectorQuery(query, topK = 5) {
@@ -83,10 +83,10 @@ export class ApiTesterCore {
                 results: results.map(r => ({
                     id: r.id,
                     similarity: r.similarity,
-                    metadata: r.metadata
+                    metadata: r.metadata,
                 })),
                 query,
-                latency
+                latency,
             };
         }
         catch (error) {
@@ -95,7 +95,7 @@ export class ApiTesterCore {
                 success: false,
                 results: [],
                 query,
-                latency
+                latency,
             };
         }
     }
@@ -108,7 +108,7 @@ export class ApiTesterCore {
             const result = await this.testLLM(provider, apiKey, model, prompt);
             results.push({
                 ...result,
-                response: `Phase: ${phase}\n${result.response || result.error}`
+                response: `Phase: ${phase}\n${result.response || result.error}`,
             });
         }
         return results;
@@ -119,10 +119,10 @@ export class ApiTesterCore {
         }
         // Basic validation patterns
         const patterns = {
-            'OpenAI': /^sk-[a-zA-Z0-9]{32,}$/,
-            'Anthropic': /^sk-ant-[a-zA-Z0-9]{32,}$/,
-            'xAI': /^xai-[a-zA-Z0-9]{32,}$/,
-            'OpenRouter': /^sk-or-[a-zA-Z0-9]{32,}$/
+            OpenAI: /^sk-[a-zA-Z0-9]{32,}$/,
+            Anthropic: /^sk-ant-[a-zA-Z0-9]{32,}$/,
+            xAI: /^xai-[a-zA-Z0-9]{32,}$/,
+            OpenRouter: /^sk-or-[a-zA-Z0-9]{32,}$/,
         };
         const pattern = patterns[provider];
         return pattern ? pattern.test(apiKey) : apiKey.length > 10;
@@ -132,10 +132,10 @@ export class ApiTesterCore {
     }
     getSupportedModels(provider) {
         const models = {
-            'OpenAI': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-            'Anthropic': ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
-            'xAI': ['grok-beta', 'grok-pro'],
-            'OpenRouter': ['gpt-4', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet']
+            OpenAI: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+            Anthropic: ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
+            xAI: ['grok-beta', 'grok-pro'],
+            OpenRouter: ['gpt-4', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet'],
         };
         return models[provider] || [];
     }

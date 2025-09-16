@@ -38,7 +38,7 @@ export class AdaptiveWorkflowRL {
     { type: 'skip', confidence: 0.8 },
     { type: 'repeat', confidence: 0.9 },
     { type: 'branch', target: 'Testing', confidence: 0.7 },
-    { type: 'optimize', confidence: 0.6 }
+    { type: 'optimize', confidence: 0.6 },
   ];
 
   constructor() {
@@ -50,7 +50,7 @@ export class AdaptiveWorkflowRL {
    */
   getBestAction(state: WorkflowState): WorkflowAction {
     const stateKey = this.serializeState(state);
-    
+
     // Epsilon-greedy exploration
     if (Math.random() < this.explorationRate) {
       return this.getRandomAction();
@@ -72,7 +72,9 @@ export class AdaptiveWorkflowRL {
       }
     }
 
-    console.log(`RL: Selected action ${bestAction.type} for state ${stateKey} (Q-value: ${bestQValue.toFixed(3)})`);
+    console.log(
+      `RL: Selected action ${bestAction.type} for state ${stateKey} (Q-value: ${bestQValue.toFixed(3)})`
+    );
     return bestAction;
   }
 
@@ -80,9 +82,9 @@ export class AdaptiveWorkflowRL {
    * Update Q-value based on reward received
    */
   updateQValue(
-    state: WorkflowState, 
-    action: WorkflowAction, 
-    reward: number, 
+    state: WorkflowState,
+    action: WorkflowAction,
+    reward: number,
     nextState: WorkflowState
   ): void {
     const stateKey = this.serializeState(state);
@@ -95,14 +97,14 @@ export class AdaptiveWorkflowRL {
     }
 
     const stateActions = this.qTable.get(stateKey)!;
-    
+
     // Initialize action if not exists
     if (!stateActions.has(actionKey)) {
       stateActions.set(actionKey, {
         state: stateKey,
         action: actionKey,
         qValue: 0,
-        visits: 0
+        visits: 0,
       });
     }
 
@@ -119,9 +121,8 @@ export class AdaptiveWorkflowRL {
 
     // Q-learning update rule
     const oldQValue = entry.qValue;
-    const newQValue = oldQValue + this.learningRate * (
-      reward + this.discountFactor * maxNextQValue - oldQValue
-    );
+    const newQValue =
+      oldQValue + this.learningRate * (reward + this.discountFactor * maxNextQValue - oldQValue);
 
     entry.qValue = newQValue;
     entry.visits++;
@@ -132,8 +133,10 @@ export class AdaptiveWorkflowRL {
       this.explorationRate * this.explorationDecay
     );
 
-    console.log(`RL: Updated Q(${stateKey}, ${actionKey}) from ${oldQValue.toFixed(3)} to ${newQValue.toFixed(3)} (reward: ${reward.toFixed(3)})`);
-    
+    console.log(
+      `RL: Updated Q(${stateKey}, ${actionKey}) from ${oldQValue.toFixed(3)} to ${newQValue.toFixed(3)} (reward: ${reward.toFixed(3)})`
+    );
+
     // Save updated Q-table periodically
     if (entry.visits % 10 === 0) {
       this.saveQTable();
@@ -216,14 +219,14 @@ export class AdaptiveWorkflowRL {
       complexity: Math.round(state.projectComplexity * 10) / 10,
       satisfaction: Math.round(state.userSatisfaction * 10) / 10,
       errorRate: Math.round(state.errorRate * 10) / 10,
-      timeNorm: Math.round(state.timeSpent * 10) / 10
+      timeNorm: Math.round(state.timeSpent * 10) / 10,
     });
   }
 
   private serializeAction(action: WorkflowAction): string {
     return JSON.stringify({
       type: action.type,
-      target: action.target || null
+      target: action.target || null,
     });
   }
 
@@ -232,7 +235,7 @@ export class AdaptiveWorkflowRL {
     return {
       type: parsed.type,
       target: parsed.target,
-      confidence: 0.8 // Default confidence for deserialized actions
+      confidence: 0.8, // Default confidence for deserialized actions
     };
   }
 
@@ -243,8 +246,8 @@ export class AdaptiveWorkflowRL {
         actions: Array.from(actions.entries()).map(([actionKey, entry]) => ({
           action: actionKey,
           qValue: entry.qValue,
-          visits: entry.visits
-        }))
+          visits: entry.visits,
+        })),
       }));
 
       // Store in memory for now - in VS Code extension, this would use vscode.ExtensionContext.globalState
@@ -268,7 +271,7 @@ export class AdaptiveWorkflowRL {
             state: stateData.state,
             action: actionData.action,
             qValue: actionData.qValue,
-            visits: actionData.visits
+            visits: actionData.visits,
           });
         }
         this.qTable.set(stateData.state, stateActions);
@@ -292,7 +295,7 @@ export class AdaptiveWorkflowRL {
     return {
       totalStates: this.qTable.size,
       totalActions,
-      explorationRate: this.explorationRate
+      explorationRate: this.explorationRate,
     };
   }
 }

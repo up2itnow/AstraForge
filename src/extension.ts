@@ -16,7 +16,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Register providers immediately but lazy-load heavy modules
   await registerProviders(context);
-  
+
   // Register commands
   registerCommands(context);
 
@@ -60,7 +60,7 @@ async function registerProviders(context: vscode.ExtensionContext) {
       resolveWebviewView: async (webviewView, context, token) => {
         const provider = await getProjectIgnition();
         return provider.resolveWebviewView(webviewView, context, token);
-      }
+      },
     })
   );
 }
@@ -170,12 +170,8 @@ async function ensureGitManager() {
  */
 async function ensureWorkflowManager(context: vscode.ExtensionContext) {
   if (!workflowManager) {
-    await Promise.all([
-      ensureLLMManager(),
-      ensureVectorDB(context),
-      ensureGitManager()
-    ]);
-    
+    await Promise.all([ensureLLMManager(), ensureVectorDB(context), ensureGitManager()]);
+
     const { WorkflowManager } = await import('./workflow/workflowManager');
     workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
   }
@@ -186,7 +182,7 @@ export function deactivate() {
   if (vectorDB) {
     vectorDB.close();
   }
-  
+
   if (llmManager) {
     llmManager.clearCache();
   }

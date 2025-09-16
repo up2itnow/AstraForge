@@ -1,49 +1,70 @@
 # AstraForge IDE
 
-> **AI-powered self-improving IDE extension for turning ideas into applications with LLM panels**
+> **AI-powered self-improving IDE extension for turning ideas into applications
+> with LLM panels**
 
 [![CI/CD Pipeline](https://github.com/username/AstraForge/actions/workflows/ci.yml/badge.svg)](https://github.com/username/AstraForge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
 
-AstraForge IDE is a revolutionary VS Code extension that transforms project ideas into fully functional applications using multi-agent LLM collaboration, vector-based context retrieval, and automated workflow management. Built with visionary AI principles, it embodies the future of autonomous development.
+AstraForge IDE is a revolutionary VS Code extension that transforms project
+ideas into fully functional applications using multi-agent LLM collaboration,
+vector-based context retrieval, and automated workflow management. Built with
+visionary AI principles, it embodies the future of autonomous development.
 
 ## Features
 
 ### ✅ Implemented Features
 
-- **Multi-LLM Panel**: Support for OpenAI, Anthropic, xAI (Grok), and OpenRouter with modular provider architecture
-- **Modular Architecture**: Clean provider interface for easy addition of new LLM APIs
-- **Request Caching**: LLM response caching with TTL and throttling to optimize performance
-- **Parallel Processing**: Concurrent LLM requests with configurable limits using Promise.all
-- **Input Security**: Comprehensive input validation and sanitization for all user inputs
-- **Lazy Loading**: Optimized VS Code extension activation with on-demand module loading  
+- **Multi-LLM Panel**: Support for OpenAI, Anthropic, xAI (Grok), and OpenRouter
+  with modular provider architecture
+- **Modular Architecture**: Clean provider interface for easy addition of new
+  LLM APIs
+- **Request Caching**: LLM response caching with TTL and throttling to optimize
+  performance
+- **Parallel Processing**: Concurrent LLM requests with configurable limits
+  using Promise.all
+- **Input Security**: Comprehensive input validation and sanitization for all
+  user inputs
+- **Lazy Loading**: Optimized VS Code extension activation with on-demand module
+  loading
 - **Git Integration**: Basic automated commits and version control
-- **Workflow Foundation**: Phase-based development structure (Planning → Prototyping → Testing → Deployment)
-- **Configuration Management**: Environment-based configuration with .env support
-- **Code Quality**: ESLint + Prettier configuration with TypeScript best practices
-- **CI/CD Pipeline**: GitHub Actions for automated testing, linting, and deployment
-- **Semantic Versioning**: Conventional commits with automated changelog generation
+- **Workflow Foundation**: Phase-based development structure (Planning →
+  Prototyping → Testing → Deployment)
+- **Configuration Management**: Environment-based configuration with .env
+  support
+- **Code Quality**: ESLint + Prettier configuration with TypeScript best
+  practices
+- **CI/CD Pipeline**: GitHub Actions for automated testing, linting, and
+  deployment
+- **Semantic Versioning**: Conventional commits with automated changelog
+  generation
 
 ### 🚧 In Development
 
-- **Vector Context**: Smart context retrieval using vector embeddings (basic implementation exists)
-- **Enhanced Workflow**: Advanced phased development with user oversight and feedback
+- **Vector Context**: Smart context retrieval using vector embeddings (basic
+  implementation exists)
+- **Enhanced Workflow**: Advanced phased development with user oversight and
+  feedback
 - **LLM Voting System**: Multi-agent consensus building for decision making
 - **Reinforcement Learning**: Workflow optimization based on user feedback
 - **Testing Framework**: Comprehensive unit and integration test coverage
-- **Performance Optimization**: Vector DB indexing and advanced caching strategies
+- **Performance Optimization**: Vector DB indexing and advanced caching
+  strategies
 
 ### 📋 Planned Features
 
-- **LanceDB Integration**: Short-term session memory separation from long-term storage
+- **LanceDB Integration**: Short-term session memory separation from long-term
+  storage
 - **PostgreSQL Support**: Long-term persistent memory storage
 - **Real-time Collaboration**: WebSocket-based multi-user development sessions
 - **Advanced Security**: Secret scanning, API key encryption, and audit trails
-- **VS Code Marketplace**: Official extension publication with marketplace features
+- **VS Code Marketplace**: Official extension publication with marketplace
+  features
 - **Documentation**: Complete API docs, ADRs, and contributor guides
-- **Analytics**: Usage metrics, performance monitoring, and user behavior insights
+- **Analytics**: Usage metrics, performance monitoring, and user behavior
+  insights
 
 ## Quick Start
 
@@ -56,17 +77,20 @@ AstraForge IDE is a revolutionary VS Code extension that transforms project idea
 ### Installation
 
 1. **Clone the repository**:
+
    ```bash
    git clone https://github.com/username/AstraForge.git
    cd AstraForge
    ```
 
 2. **Install dependencies**:
+
    ```bash
    npm install
    ```
 
 3. **Build the extension**:
+
    ```bash
    npm run compile
    ```
@@ -78,6 +102,7 @@ AstraForge IDE is a revolutionary VS Code extension that transforms project idea
 ### Configuration
 
 1. **Setup Environment Variables**:
+
    ```bash
    cp .env.example .env
    # Edit .env and add your API keys
@@ -86,7 +111,8 @@ AstraForge IDE is a revolutionary VS Code extension that transforms project idea
 2. **Setup LLM Panel**:
    - Open Command Palette (`Ctrl+Shift+P`)
    - Run "AstraForge: Setup LLM Panel"
-   - Configure 3-5 LLMs with your API keys from different providers for optimal collaboration
+   - Configure 3-5 LLMs with your API keys from different providers for optimal
+     collaboration
 
 3. **Configure Performance Settings**:
    ```bash
@@ -111,7 +137,8 @@ AstraForge IDE is a revolutionary VS Code extension that transforms project idea
 - **Custom Refinements**: Provide specific instructions for complex requirements
 - **Innovation Suggestions**: AI proposes cutting-edge enhancements
 - **Vector Context**: Intelligent retrieval of relevant project information
-- **Archive Management**: Automatic cleanup and organization of project artifacts
+- **Archive Management**: Automatic cleanup and organization of project
+  artifacts
 
 ## Development
 
@@ -135,7 +162,7 @@ AstraForge/
 ### Scripts
 
 - `npm run compile` - Build TypeScript
-- `npm run watch` - Watch mode for development  
+- `npm run watch` - Watch mode for development
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix linting issues
 - `npm run format` - Format code with Prettier
@@ -165,23 +192,27 @@ AstraForge/
 ## Roadmap
 
 ### Phase 1: Foundation ✅
+
 - [x] Project restructuring and cleanup
 - [x] Core extension architecture
 - [x] Multi-LLM provider support
 - [x] Basic workflow management
 
 ### Phase 2: Core Functionality (In Progress)
+
 - [ ] Enhanced AI collaboration features
 - [ ] Real vector embedding integration
 - [ ] Reinforcement learning for workflow optimization
 - [ ] Advanced multi-agent isolation
 
 ### Phase 3: Testing and Documentation
+
 - [ ] Comprehensive test suite (85% coverage target)
 - [ ] API documentation and ADRs
 - [ ] Security auditing and key encryption
 
 ### Phase 4: Deployment and Iteration
+
 - [ ] VS Code Marketplace publication
 - [ ] Feedback loop implementation
 - [ ] WebSocket collaboration features
@@ -189,7 +220,8 @@ AstraForge/
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
+for details.
 
 ## Acknowledgments
 
@@ -199,4 +231,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-*"The future of coding is not about replacing developers, but about amplifying human creativity through AI collaboration."* - AstraForge Vision
+_"The future of coding is not about replacing developers, but about amplifying
+human creativity through AI collaboration."_ - AstraForge Vision
