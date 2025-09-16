@@ -11,12 +11,39 @@ AstraForge IDE is a revolutionary VS Code extension that transforms project idea
 
 ## Features
 
-- **Multi-LLM Panel**: Support for OpenAI, Anthropic, xAI (Grok), and OpenRouter
-- **Intelligent Workflow**: Phased development (Planning → Prototyping → Testing → Deployment)
-- **Vector Context**: Smart context retrieval using vector embeddings
-- **Git Integration**: Automated commits and version control
-- **Self-Improving**: Learns from user feedback and optimizes workflows
-- **Modular Architecture**: Clean, scalable codebase following SOLID principles
+### ✅ Implemented Features
+
+- **Multi-LLM Panel**: Support for OpenAI, Anthropic, xAI (Grok), and OpenRouter with modular provider architecture
+- **Modular Architecture**: Clean provider interface for easy addition of new LLM APIs
+- **Request Caching**: LLM response caching with TTL and throttling to optimize performance
+- **Parallel Processing**: Concurrent LLM requests with configurable limits using Promise.all
+- **Input Security**: Comprehensive input validation and sanitization for all user inputs
+- **Lazy Loading**: Optimized VS Code extension activation with on-demand module loading  
+- **Git Integration**: Basic automated commits and version control
+- **Workflow Foundation**: Phase-based development structure (Planning → Prototyping → Testing → Deployment)
+- **Configuration Management**: Environment-based configuration with .env support
+- **Code Quality**: ESLint + Prettier configuration with TypeScript best practices
+- **CI/CD Pipeline**: GitHub Actions for automated testing, linting, and deployment
+- **Semantic Versioning**: Conventional commits with automated changelog generation
+
+### 🚧 In Development
+
+- **Vector Context**: Smart context retrieval using vector embeddings (basic implementation exists)
+- **Enhanced Workflow**: Advanced phased development with user oversight and feedback
+- **LLM Voting System**: Multi-agent consensus building for decision making
+- **Reinforcement Learning**: Workflow optimization based on user feedback
+- **Testing Framework**: Comprehensive unit and integration test coverage
+- **Performance Optimization**: Vector DB indexing and advanced caching strategies
+
+### 📋 Planned Features
+
+- **LanceDB Integration**: Short-term session memory separation from long-term storage
+- **PostgreSQL Support**: Long-term persistent memory storage
+- **Real-time Collaboration**: WebSocket-based multi-user development sessions
+- **Advanced Security**: Secret scanning, API key encryption, and audit trails
+- **VS Code Marketplace**: Official extension publication with marketplace features
+- **Documentation**: Complete API docs, ADRs, and contributor guides
+- **Analytics**: Usage metrics, performance monitoring, and user behavior insights
 
 ## Quick Start
 
@@ -50,15 +77,24 @@ AstraForge IDE is a revolutionary VS Code extension that transforms project idea
 
 ### Configuration
 
-1. **Setup LLM Panel**:
+1. **Setup Environment Variables**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your API keys
+   ```
+
+2. **Setup LLM Panel**:
    - Open Command Palette (`Ctrl+Shift+P`)
    - Run "AstraForge: Setup LLM Panel"
-   - Configure 3-5 LLMs with your API keys
+   - Configure 3-5 LLMs with your API keys from different providers for optimal collaboration
 
-2. **Start Building**:
-   - Open the AstraForge sidebar
-   - Enter your project idea in "Project Ignition"
-   - Let the AI panels collaborate and build your vision
+3. **Configure Performance Settings**:
+   ```bash
+   # In your .env file
+   MAX_CONCURRENT_REQUESTS=3
+   ENABLE_REQUEST_CACHING=true
+   CACHE_TTL=3600
+   ```
 
 ## Usage
 
@@ -99,11 +135,17 @@ AstraForge/
 ### Scripts
 
 - `npm run compile` - Build TypeScript
-- `npm run watch` - Watch mode for development
+- `npm run watch` - Watch mode for development  
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix linting issues
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check code formatting
+- `npm run type-check` - TypeScript type checking without compilation
 - `npm test` - Run tests
 - `npm run test:coverage` - Run tests with coverage
+- `npm run test:watch` - Run tests in watch mode
+- `npm run package` - Package extension as VSIX
+- `npm run clean` - Clean build artifacts
 
 ### Contributing
 

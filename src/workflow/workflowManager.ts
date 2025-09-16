@@ -1,3 +1,14 @@
+/**
+ * AstraForge Workflow Manager
+ * 
+ * Manages the complete software development workflow from idea to deployment.
+ * Integrates LLM collaboration, vector-based context retrieval, Git version control,
+ * and reinforcement learning for workflow optimization.
+ * 
+ * @author AstraForge Team
+ * @version 1.0.0
+ */
+
 import * as vscode from 'vscode';
 import { LLMManager } from '../llm/llmManager';
 import { VectorDB } from '../db/vectorDB';
@@ -6,30 +17,71 @@ import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
 import * as path from 'path';
 
+/**
+ * Metrics tracking for workflow performance and user engagement
+ */
 interface WorkflowMetrics {
+  /** Timestamp when workflow started */
   startTime: number;
+  /** Timestamp when current phase started */
   phaseStartTime: number;
+  /** Number of errors encountered */
   errors: number;
+  /** Array of user feedback scores (0-1) */
   userFeedback: number[];
+  /** Number of iterations performed */
   iterations: number;
 }
 
+/**
+ * Main workflow orchestrator that manages the complete development lifecycle
+ * 
+ * Features:
+ * - Phase-based development (Planning → Prototyping → Testing → Deployment)
+ * - Multi-LLM collaboration and consensus voting
+ * - Vector-based context retrieval for consistency
+ * - Reinforcement learning for workflow optimization
+ * - Real-time collaboration support
+ * - Git integration for version control
+ * - User oversight and feedback integration
+ */
 export class WorkflowManager {
+  /** Current phase index in the workflow */
   private currentPhase = 0;
+  
+  /** Ordered list of workflow phases */
   private phases = ['Planning', 'Prototyping', 'Testing', 'Deployment'];
+  
+  /** User's project idea/description */
   private projectIdea: string = '';
+  
+  /** Generated project plan */
   private buildPlan: string = '';
+  
+  /** Reinforcement learning system for workflow optimization */
   private workflowRL: AdaptiveWorkflowRL;
+  
+  /** Optional collaboration server for multi-user workflows */
   private collaborationServer?: CollaborationServer;
+  
+  /** Performance and engagement metrics */
   private metrics: WorkflowMetrics;
+  
+  /** Unique identifier for this workspace session */
   private workspaceId: string;
 
+  /**
+   * Initialize the WorkflowManager with required dependencies
+   * 
+   * @param llmManager - Manager for LLM provider interactions
+   * @param vectorDB - Vector database for context storage and retrieval
+   * @param gitManager - Git integration for version control
+   */
   constructor(
     private llmManager: LLMManager,
     private vectorDB: VectorDB,
     private gitManager: GitManager
   ) {
-    // These parameters are used throughout the class methods
     this.workflowRL = new AdaptiveWorkflowRL();
     this.workspaceId = `workspace_${Date.now()}`;
     this.metrics = {
@@ -43,7 +95,21 @@ export class WorkflowManager {
     this.initializeCollaboration();
   }
 
-  async startWorkflow(idea: string, option?: string) {
+  /**
+   * Start a new development workflow from a project idea
+   * 
+   * @param idea - The user's project description or idea
+   * @param option - Optional workflow configuration or starting phase
+   * @returns Promise that resolves when workflow initialization is complete
+   * 
+   * @example
+   * ```typescript
+   * await workflowManager.startWorkflow(
+   *   "Create a task management app with React and TypeScript"
+   * );
+   * ```
+   */
+  async startWorkflow(idea: string, option?: string): Promise<void> {
     this.projectIdea = idea;
     this.currentPhase = 0;
 
