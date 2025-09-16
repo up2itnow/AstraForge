@@ -30,7 +30,7 @@ class ApiTesterCLI {
                 latency,
                 timestamp: Date.now(),
                 provider,
-                model
+                model,
             };
         }
         catch (error) {
@@ -41,7 +41,7 @@ class ApiTesterCLI {
                 latency,
                 timestamp: Date.now(),
                 provider,
-                model
+                model,
             };
         }
     }
@@ -49,12 +49,12 @@ class ApiTesterCLI {
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model,
             messages: [{ role: 'user', content: prompt }],
-            max_tokens: 1000
+            max_tokens: 1000,
         }, {
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            }
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
         });
         return response.data.choices[0].message.content;
     }
@@ -62,13 +62,13 @@ class ApiTesterCLI {
         const response = await axios.post('https://api.anthropic.com/v1/messages', {
             model,
             max_tokens: 1000,
-            messages: [{ role: 'user', content: prompt }]
+            messages: [{ role: 'user', content: prompt }],
         }, {
             headers: {
                 'x-api-key': apiKey,
                 'Content-Type': 'application/json',
-                'anthropic-version': '2023-06-01'
-            }
+                'anthropic-version': '2023-06-01',
+            },
         });
         return response.data.content[0].text;
     }
@@ -76,12 +76,12 @@ class ApiTesterCLI {
         const response = await axios.post('https://api.x.ai/v1/chat/completions', {
             model,
             messages: [{ role: 'user', content: prompt }],
-            max_tokens: 1000
+            max_tokens: 1000,
         }, {
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            }
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
         });
         return response.data.choices[0].message.content;
     }
@@ -89,12 +89,12 @@ class ApiTesterCLI {
         const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
             model,
             messages: [{ role: 'user', content: prompt }],
-            max_tokens: 1000
+            max_tokens: 1000,
         }, {
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            }
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
         });
         return response.data.choices[0].message.content;
     }
@@ -116,7 +116,7 @@ class ApiTesterCLI {
             failed,
             results: batchResults,
             averageLatency,
-            totalTime
+            totalTime,
         };
     }
     async testWorkflowSimulation(idea, provider, apiKey, model) {
@@ -128,7 +128,7 @@ class ApiTesterCLI {
             const result = await this.testLLM(provider, apiKey, model, prompt);
             results.push({
                 ...result,
-                response: `Phase: ${phase}\n${result.response || result.error}`
+                response: `Phase: ${phase}\n${result.response || result.error}`,
             });
         }
         return results;
@@ -139,10 +139,10 @@ class ApiTesterCLI {
         }
         // Basic validation patterns
         const patterns = {
-            'OpenAI': /^sk-[a-zA-Z0-9]{32,}$/,
-            'Anthropic': /^sk-ant-[a-zA-Z0-9]{32,}$/,
-            'xAI': /^xai-[a-zA-Z0-9]{32,}$/,
-            'OpenRouter': /^sk-or-[a-zA-Z0-9]{32,}$/
+            OpenAI: /^sk-[a-zA-Z0-9]{32,}$/,
+            Anthropic: /^sk-ant-[a-zA-Z0-9]{32,}$/,
+            xAI: /^xai-[a-zA-Z0-9]{32,}$/,
+            OpenRouter: /^sk-or-[a-zA-Z0-9]{32,}$/,
         };
         const pattern = patterns[provider];
         return pattern ? pattern.test(apiKey) : apiKey.length > 10;
@@ -152,20 +152,17 @@ class ApiTesterCLI {
     }
     getSupportedModels(provider) {
         const models = {
-            'OpenAI': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-            'Anthropic': ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
-            'xAI': ['grok-beta', 'grok-pro'],
-            'OpenRouter': ['gpt-4', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet']
+            OpenAI: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+            Anthropic: ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
+            xAI: ['grok-beta', 'grok-pro'],
+            OpenRouter: ['gpt-4', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet'],
         };
         return models[provider] || [];
     }
 }
 const program = new Command();
 const tester = new ApiTesterCLI();
-program
-    .name('astraforge')
-    .description('AstraForge API Testing Interface')
-    .version('0.0.1');
+program.name('astraforge').description('AstraForge API Testing Interface').version('0.0.1');
 // LLM Testing Commands
 program
     .command('test')
@@ -204,7 +201,7 @@ program
     .description('List supported providers and models')
     .option('--providers', 'List supported providers')
     .option('--models <provider>', 'List models for a provider')
-    .action((options) => {
+    .action(options => {
     if (options.providers) {
         const providers = tester.getSupportedProviders();
         console.log('Supported Providers:');
@@ -229,7 +226,7 @@ async function testSingle(options) {
     const output = {
         type: 'single_test',
         timestamp: new Date().toISOString(),
-        result
+        result,
     };
     if (options.output) {
         fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
@@ -249,7 +246,8 @@ async function testBatchFromFile(options) {
         console.error(`Error: File ${options.file} not found`);
         process.exit(1);
     }
-    const prompts = fs.readFileSync(options.file, 'utf8')
+    const prompts = fs
+        .readFileSync(options.file, 'utf8')
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0);
@@ -262,7 +260,7 @@ async function testBatchFromFile(options) {
         type: 'batch_test',
         timestamp: new Date().toISOString(),
         file: options.file,
-        result
+        result,
     };
     if (options.output) {
         fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
@@ -283,7 +281,7 @@ async function testWorkflow(options) {
         type: 'workflow_simulation',
         timestamp: new Date().toISOString(),
         idea: options.workflow,
-        results
+        results,
     };
     if (options.output) {
         fs.writeFileSync(options.output, JSON.stringify(output, null, 2));

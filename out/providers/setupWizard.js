@@ -10,13 +10,15 @@ export class SetupWizardProvider {
         this._view = webviewView.webview;
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this._extensionUri]
+            localResourceRoots: [this._extensionUri],
         };
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
         webviewView.webview.onDidReceiveMessage(async (data) => {
             switch (data.type) {
                 case 'savePanel':
-                    await vscode.workspace.getConfiguration('astraforge').update('llmPanel', data.panel, true);
+                    await vscode.workspace
+                        .getConfiguration('astraforge')
+                        .update('llmPanel', data.panel, true);
                     vscode.window.showInformationMessage('LLM Panel configured! Ready for ignition.');
                     break;
             }

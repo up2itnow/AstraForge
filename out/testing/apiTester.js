@@ -4,10 +4,7 @@ import { ApiTesterCore } from './apiTesterCore.js';
 import * as fs from 'fs';
 const program = new Command();
 const tester = new ApiTesterCore();
-program
-    .name('astraforge')
-    .description('AstraForge API Testing Interface')
-    .version('0.0.1');
+program.name('astraforge').description('AstraForge API Testing Interface').version('0.0.1');
 // LLM Testing Commands
 program
     .command('test')
@@ -70,7 +67,7 @@ program
     .description('List supported providers and models')
     .option('--providers', 'List supported providers')
     .option('--models <provider>', 'List models for a provider')
-    .action((options) => {
+    .action(options => {
     if (options.providers) {
         const providers = tester.getSupportedProviders();
         console.log('Supported Providers:');
@@ -95,7 +92,7 @@ async function testSingle(options) {
     const output = {
         type: 'single_test',
         timestamp: new Date().toISOString(),
-        result
+        result,
     };
     if (options.output) {
         fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
@@ -115,7 +112,8 @@ async function testBatchFromFile(options) {
         console.error(`Error: File ${options.file} not found`);
         process.exit(1);
     }
-    const prompts = fs.readFileSync(options.file, 'utf8')
+    const prompts = fs
+        .readFileSync(options.file, 'utf8')
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0);
@@ -128,7 +126,7 @@ async function testBatchFromFile(options) {
         type: 'batch_test',
         timestamp: new Date().toISOString(),
         file: options.file,
-        result
+        result,
     };
     if (options.output) {
         fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
@@ -149,7 +147,7 @@ async function testWorkflow(options) {
         type: 'workflow_simulation',
         timestamp: new Date().toISOString(),
         idea: options.workflow,
-        results
+        results,
     };
     if (options.output) {
         fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
@@ -165,7 +163,7 @@ async function testVector(options) {
     const output = {
         type: 'vector_test',
         timestamp: new Date().toISOString(),
-        result
+        result,
     };
     if (options.output) {
         fs.writeFileSync(options.output, JSON.stringify(output, null, 2));

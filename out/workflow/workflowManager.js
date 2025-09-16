@@ -1,17 +1,49 @@
+/**
+ * AstraForge Workflow Manager
+ *
+ * Manages the complete software development workflow from idea to deployment.
+ * Integrates LLM collaboration, vector-based context retrieval, Git version control,
+ * and reinforcement learning for workflow optimization.
+ *
+ * @author AstraForge Team
+ * @version 1.0.0
+ */
 import * as vscode from 'vscode';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
 import * as path from 'path';
+/**
+ * Main workflow orchestrator that manages the complete development lifecycle
+ *
+ * Features:
+ * - Phase-based development (Planning → Prototyping → Testing → Deployment)
+ * - Multi-LLM collaboration and consensus voting
+ * - Vector-based context retrieval for consistency
+ * - Reinforcement learning for workflow optimization
+ * - Real-time collaboration support
+ * - Git integration for version control
+ * - User oversight and feedback integration
+ */
 export class WorkflowManager {
+    /**
+     * Initialize the WorkflowManager with required dependencies
+     *
+     * @param llmManager - Manager for LLM provider interactions
+     * @param vectorDB - Vector database for context storage and retrieval
+     * @param gitManager - Git integration for version control
+     */
     constructor(llmManager, vectorDB, gitManager) {
         this.llmManager = llmManager;
         this.vectorDB = vectorDB;
         this.gitManager = gitManager;
+        /** Current phase index in the workflow */
         this.currentPhase = 0;
+        /** Ordered list of workflow phases */
         this.phases = ['Planning', 'Prototyping', 'Testing', 'Deployment'];
+        /** User's project idea/description */
         this.projectIdea = '';
+        /** Generated project plan */
         this.buildPlan = '';
-        // These parameters are used throughout the class methods
         this.workflowRL = new AdaptiveWorkflowRL();
         this.workspaceId = `workspace_${Date.now()}`;
         this.metrics = {
@@ -19,10 +51,24 @@ export class WorkflowManager {
             phaseStartTime: Date.now(),
             errors: 0,
             userFeedback: [],
-            iterations: 0
+            iterations: 0,
         };
         this.initializeCollaboration();
     }
+    /**
+     * Start a new development workflow from a project idea
+     *
+     * @param idea - The user's project description or idea
+     * @param option - Optional workflow configuration or starting phase
+     * @returns Promise that resolves when workflow initialization is complete
+     *
+     * @example
+     * ```typescript
+     * await workflowManager.startWorkflow(
+     *   "Create a task management app with React and TypeScript"
+     * );
+     * ```
+     */
     async startWorkflow(idea, option) {
         this.projectIdea = idea;
         this.currentPhase = 0;
@@ -33,11 +79,14 @@ export class WorkflowManager {
             }
             // Step 2: Conferencing
             const discussion = await this.llmManager.conference(`Discuss project: ${prompt}. Propose tech stack, estimates, plan.`);
-            this.buildPlan = await this.llmManager.voteOnDecision(discussion, ['Approve Plan', 'Need Questions']);
+            this.buildPlan = await this.llmManager.voteOnDecision(discussion, [
+                'Approve Plan',
+                'Need Questions',
+            ]);
             if (this.buildPlan === 'Need Questions') {
                 const questions = await this.llmManager.queryLLM(0, `Generate 5-10 questions for clarification on ${prompt}`);
                 const answers = await vscode.window.showInputBox({
-                    prompt: `Please answer these questions: ${questions}`
+                    prompt: `Please answer these questions: ${questions}`,
                 });
                 if (answers) {
                     this.buildPlan = await this.llmManager.conference(`Incorporate answers: ${answers}. Finalize plan.`);
@@ -72,7 +121,7 @@ export class WorkflowManager {
             this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'phase_started', {
                 phase,
                 timestamp: Date.now(),
-                projectIdea: this.projectIdea
+                projectIdea: this.projectIdea,
             });
             // Enhanced context retrieval using vector DB
             const contextQuery = `${phase} for ${this.projectIdea}`;
@@ -142,20 +191,29 @@ export class WorkflowManager {
             projectComplexity: this.estimateProjectComplexity(),
             userSatisfaction: this.calculateUserSatisfaction(),
             errorRate: this.metrics.errors / Math.max(1, this.metrics.iterations),
-            timeSpent: Math.min(1, totalTime / (1000 * 60 * 60)) // Normalize to hours
+            timeSpent: Math.min(1, totalTime / (1000 * 60 * 60)), // Normalize to hours
         };
     }
     estimateProjectComplexity() {
         // Simple heuristic based on project description and phases
         const ideaLength = this.projectIdea.length;
-        const complexityKeywords = ['api', 'database', 'authentication', 'real-time', 'machine learning', 'ai', 'blockchain'];
+        const complexityKeywords = [
+            'api',
+            'database',
+            'authentication',
+            'real-time',
+            'machine learning',
+            'ai',
+            'blockchain',
+        ];
         const matches = complexityKeywords.filter(keyword => this.projectIdea.toLowerCase().includes(keyword)).length;
         return Math.min(1, (ideaLength / 500 + matches / complexityKeywords.length) / 2);
     }
     calculateUserSatisfaction() {
         if (this.metrics.userFeedback.length === 0)
             return 0.7; // Default neutral
-        return this.metrics.userFeedback.reduce((sum, rating) => sum + rating, 0) / this.metrics.userFeedback.length;
+        return (this.metrics.userFeedback.reduce((sum, rating) => sum + rating, 0) /
+            this.metrics.userFeedback.length);
     }
     async applyRLAction(action, phase) {
         switch (action.type) {
@@ -189,7 +247,8 @@ export class WorkflowManager {
         processed = `# ${phase} Phase Output\n\n*Generated: ${new Date().toISOString()}*\n\n${processed}`;
         // Validate output based on phase
         if (phase === 'Planning' && !processed.includes('architecture')) {
-            processed += '\n\n## Architecture Notes\n*Architecture details should be included in planning phase.*';
+            processed +=
+                '\n\n## Architecture Notes\n*Architecture details should be included in planning phase.*';
         }
         return processed;
     }
@@ -226,10 +285,15 @@ export class WorkflowManager {
         return await this.llmManager.queryLLM(0, suggestionPrompt);
     }
     async getUserDecision(suggestions, review) {
-        const options = ['Proceed as planned', 'Apply suggestions', 'Request modifications', 'Get more details'];
+        const options = [
+            'Proceed as planned',
+            'Apply suggestions',
+            'Request modifications',
+            'Get more details',
+        ];
         const choice = await vscode.window.showQuickPick(options, {
             placeHolder: `Review: ${review.substring(0, 100)}... | Suggestions: ${suggestions.substring(0, 100)}...`,
-            canPickMany: false
+            canPickMany: false,
         });
         return choice || 'Proceed as planned';
     }
@@ -248,7 +312,7 @@ export class WorkflowManager {
             case 'Request modifications': {
                 feedback = 0.5;
                 const modification = await vscode.window.showInputBox({
-                    prompt: 'What modifications would you like?'
+                    prompt: 'What modifications would you like?',
                 });
                 if (modification) {
                     const modifiedOutput = await this.llmManager.conference(`Apply these modifications: ${modification} to: ${output}`);
@@ -272,7 +336,7 @@ export class WorkflowManager {
             content: output,
             review,
             timestamp: Date.now(),
-            projectIdea: this.projectIdea
+            projectIdea: this.projectIdea,
         };
         const embedding = await this.vectorDB.getEmbedding(`${phase} ${this.projectIdea} ${output.substring(0, 500)}`);
         await this.vectorDB.addEmbedding(`phase_${phase}_${Date.now()}`, embedding, contextData);
@@ -347,7 +411,7 @@ ${bonuses}
             this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'project_completed', {
                 projectIdea: this.projectIdea,
                 metrics: this.metrics,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         }
         catch (error) {

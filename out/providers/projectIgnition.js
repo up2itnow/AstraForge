@@ -11,7 +11,7 @@ export class ProjectIgnitionProvider {
         this._view = webviewView.webview;
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this._extensionUri]
+            localResourceRoots: [this._extensionUri],
         };
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
         webviewView.webview.onDidReceiveMessage(async (data) => {

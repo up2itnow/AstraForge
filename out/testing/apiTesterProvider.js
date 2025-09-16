@@ -9,7 +9,7 @@ export class ApiTesterProvider {
         this._view = webviewView.webview;
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this._extensionUri]
+            localResourceRoots: [this._extensionUri],
         };
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
         // Handle messages from the webview
@@ -51,7 +51,7 @@ export class ApiTesterProvider {
             catch (error) {
                 this._sendMessage('error', {
                     message: error.message,
-                    type: data.type
+                    type: data.type,
                 });
             }
         });
@@ -60,28 +60,28 @@ export class ApiTesterProvider {
         const result = await this._tester.testLLM(data.provider, data.apiKey, data.model, data.prompt);
         this._sendMessage('llmTestResult', {
             result,
-            requestId: data.requestId
+            requestId: data.requestId,
         });
     }
     async _handleBatchTest(data) {
         const result = await this._tester.testBatchLLM(data.provider, data.apiKey, data.model, data.prompts);
         this._sendMessage('batchTestResult', {
             result,
-            requestId: data.requestId
+            requestId: data.requestId,
         });
     }
     async _handleVectorTest(data) {
         const result = await this._tester.testVectorQuery(data.query, data.topK || 5);
         this._sendMessage('vectorTestResult', {
             result,
-            requestId: data.requestId
+            requestId: data.requestId,
         });
     }
     async _handleWorkflowTest(data) {
         const results = await this._tester.testWorkflowSimulation(data.idea, data.provider, data.apiKey, data.model);
         this._sendMessage('workflowTestResult', {
             results,
-            requestId: data.requestId
+            requestId: data.requestId,
         });
     }
     _sendMessage(type, data) {

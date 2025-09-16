@@ -13,18 +13,18 @@ jest.mock('vscode', () => ({
         if (key === 'llmPanel') {
           return [
             { provider: 'OpenAI', key: 'test-key', model: 'gpt-4', role: 'primary' },
-            { provider: 'Anthropic', key: 'test-key-2', model: 'claude-3', role: 'secondary' }
+            { provider: 'Anthropic', key: 'test-key-2', model: 'claude-3', role: 'secondary' },
           ];
         }
         return undefined;
-      })
-    }))
-  }
+      }),
+    })),
+  },
 }));
 
 // Mock axios for API calls
 jest.mock('axios', () => ({
-  post: jest.fn()
+  post: jest.fn(),
 }));
 
 import axios from 'axios';
@@ -54,24 +54,24 @@ describe('LLMManager', () => {
     it('should query OpenAI successfully', async () => {
       const mockResponse = {
         data: {
-          choices: [{ message: { content: 'OpenAI response' } }]
-        }
+          choices: [{ message: { content: 'OpenAI response' } }],
+        },
       };
       mockAxios.post.mockResolvedValueOnce(mockResponse);
 
       const result = await llmManager.queryLLM(0, 'test prompt');
-      
+
       expect(mockAxios.post).toHaveBeenCalledWith(
         'https://api.openai.com/v1/chat/completions',
         expect.objectContaining({
           model: 'gpt-4',
-          messages: [{ role: 'user', content: 'test prompt' }]
+          messages: [{ role: 'user', content: 'test prompt' }],
         }),
         expect.objectContaining({
           headers: {
-            'Authorization': 'Bearer test-key',
-            'Content-Type': 'application/json'
-          }
+            Authorization: 'Bearer test-key',
+            'Content-Type': 'application/json',
+          },
         })
       );
       expect(result).toBe('OpenAI response');
@@ -89,7 +89,7 @@ describe('LLMManager', () => {
     it('should handle empty panel configuration', async () => {
       const emptyLLMManager = new LLMManager();
       (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
-        get: jest.fn(() => [])
+        get: jest.fn(() => []),
       });
 
       const result = await emptyLLMManager.conference('test prompt');
@@ -98,15 +98,13 @@ describe('LLMManager', () => {
 
     it('should process multiple LLMs in parallel', async () => {
       const mockResponse1 = {
-        data: { choices: [{ message: { content: 'Response 1' } }] }
+        data: { choices: [{ message: { content: 'Response 1' } }] },
       };
       const mockResponse2 = {
-        data: { choices: [{ message: { content: 'Response 2' } }] }
+        data: { choices: [{ message: { content: 'Response 2' } }] },
       };
 
-      mockAxios.post
-        .mockResolvedValueOnce(mockResponse1)
-        .mockResolvedValueOnce(mockResponse2);
+      mockAxios.post.mockResolvedValueOnce(mockResponse1).mockResolvedValueOnce(mockResponse2);
 
       const result = await llmManager.conference('test prompt');
 
@@ -136,7 +134,7 @@ describe('LLMManager', () => {
 
     it('should return first option when no LLMs configured', async () => {
       (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
-        get: jest.fn(() => [])
+        get: jest.fn(() => []),
       });
       const emptyManager = new LLMManager();
 
@@ -146,7 +144,9 @@ describe('LLMManager', () => {
 
     it('should process votes with fuzzy matching', async () => {
       mockAxios.post
-        .mockResolvedValueOnce({ data: { choices: [{ message: { content: 'I choose option1' } }] } })
+        .mockResolvedValueOnce({
+          data: { choices: [{ message: { content: 'I choose option1' } }] },
+        })
         .mockResolvedValueOnce({ data: { choices: [{ message: { content: 'option2' } }] } });
 
       const result = await llmManager.voteOnDecision('Choose:', ['option1', 'option2']);

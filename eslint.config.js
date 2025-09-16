@@ -15,7 +15,7 @@ export default [
       '@typescript-eslint': typescript,
     },
     rules: {
-      'complexity': ['error', 10],
+      complexity: ['error', 10],
       'max-lines-per-function': ['warn', 50],
       'no-console': 'warn',
       '@typescript-eslint/no-unused-vars': 'off', // Temporarily disabled for interface requirements

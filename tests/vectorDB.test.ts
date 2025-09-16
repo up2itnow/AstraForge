@@ -13,8 +13,8 @@ const mockFs = fs as jest.Mocked<typeof fs>;
 // Mock Hugging Face inference
 jest.mock('@huggingface/inference', () => ({
   HfInference: jest.fn().mockImplementation(() => ({
-    featureExtraction: jest.fn()
-  }))
+    featureExtraction: jest.fn(),
+  })),
 }));
 
 import { HfInference } from '@huggingface/inference';
@@ -27,10 +27,10 @@ describe('VectorDB', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Setup HfInference mock
     mockHf = {
-      featureExtraction: jest.fn()
+      featureExtraction: jest.fn(),
     } as any;
     MockHfInference.mockImplementation(() => mockHf);
 
@@ -48,15 +48,14 @@ describe('VectorDB', () => {
 
       await vectorDB.init();
 
-      expect(mockFs.mkdirSync).toHaveBeenCalledWith(
-        path.join(testStoragePath, 'vectordb'),
-        { recursive: true }
-      );
+      expect(mockFs.mkdirSync).toHaveBeenCalledWith(path.join(testStoragePath, 'vectordb'), {
+        recursive: true,
+      });
     });
 
     it('should load existing data if available', async () => {
       const mockData = JSON.stringify([
-        { id: 'test1', vector: [1, 2, 3], metadata: { test: 'data' } }
+        { id: 'test1', vector: [1, 2, 3], metadata: { test: 'data' } },
       ]);
 
       mockFs.existsSync
@@ -80,7 +79,7 @@ describe('VectorDB', () => {
 
       // Should not throw
       await vectorDB.init();
-      
+
       // Internal items array should be empty
       expect(true).toBe(true); // Test passes if no exception thrown
     });
@@ -95,7 +94,7 @@ describe('VectorDB', () => {
 
       expect(mockHf.featureExtraction).toHaveBeenCalledWith({
         model: 'sentence-transformers/all-MiniLM-L6-v2',
-        inputs: 'test text'
+        inputs: 'test text',
       });
       expect(result).toEqual(mockEmbedding);
     });
@@ -126,13 +125,13 @@ describe('VectorDB', () => {
 
       expect(mockHf.featureExtraction).toHaveBeenCalledWith({
         model: 'sentence-transformers/all-MiniLM-L6-v2',
-        inputs: 'test text'
+        inputs: 'test text',
       });
     });
 
     it('should handle empty text with fallback', async () => {
       const result = await vectorDB.getEmbedding('');
-      
+
       expect(result).toHaveLength(384);
       expect(mockHf.featureExtraction).not.toHaveBeenCalled();
     });
@@ -176,7 +175,7 @@ describe('VectorDB', () => {
       let callCount = 0;
       Date.now = jest.fn(() => {
         callCount++;
-        return originalDateNow() + (callCount * 50); // Simulate time passage
+        return originalDateNow() + callCount * 50; // Simulate time passage
       });
 
       await vectorDB.getBatchEmbeddings(['text1', 'text2', 'text3', 'text4', 'text5', 'text6']);
