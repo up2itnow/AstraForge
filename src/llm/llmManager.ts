@@ -286,6 +286,25 @@ Respond with ONLY the option you choose, exactly as written.`;
   }
 
   /**
+   * Generate response from a specific provider
+   * Legacy method for backward compatibility
+   */
+  async generateResponse(provider: string, prompt: string): Promise<string> {
+    // Find LLM config with matching provider
+    const config = this.panel.find(llm => llm.provider === provider);
+    if (!config) {
+      // Fallback to first available LLM
+      if (this.panel.length > 0) {
+        return this.queryLLM(0, prompt);
+      }
+      throw new Error(`No LLM configured for provider: ${provider}`);
+    }
+
+    const index = this.panel.indexOf(config);
+    return this.queryLLM(index, prompt);
+  }
+
+  /**
    * Get cache statistics
    */
   getCacheStats(): ReturnType<LLMCache['getStats']> {

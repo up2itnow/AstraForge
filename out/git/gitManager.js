@@ -74,5 +74,42 @@ export class GitManager {
             return `Git status failed: ${error.message}`;
         }
     }
+    /**
+     * Add specific files and commit with a message
+     * Legacy method for backward compatibility
+     */
+    async addAndCommit(files, message) {
+        if (!this.workspacePath) {
+            vscode.window.showWarningMessage('Git workspace not initialized');
+            return;
+        }
+        try {
+            // Add specified files
+            for (const file of files) {
+                await execAsync(`git add "${file}"`, { cwd: this.workspacePath });
+            }
+            // Check if there are changes to commit
+            const { stdout: status } = await execAsync('git status --porcelain', {
+                cwd: this.workspacePath,
+            });
+            if (status.trim()) {
+                // There are changes to commit
+                await execAsync(`git commit -m "${message}"`, { cwd: this.workspacePath });
+                vscode.window.showInformationMessage(`Committed: ${message}`);
+            }
+            else {
+                vscode.window.showInformationMessage('No changes to commit');
+            }
+        }
+        catch (error) {
+            // Handle case where git user is not configured
+            if (error.message.includes('user.email') || error.message.includes('user.name')) {
+                vscode.window.showErrorMessage('Git user not configured. Please set git user.name and user.email');
+            }
+            else {
+                vscode.window.showErrorMessage(`Git commit failed: ${error.message}`);
+            }
+        }
+    }
 }
 //# sourceMappingURL=gitManager.js.map

@@ -186,4 +186,17 @@ export class VectorDB {
 
     return embeddings;
   }
+
+  /**
+   * Add a document with text content to the vector database
+   * Legacy method for backward compatibility
+   */
+  async addDocument(id: string, content: string, metadata: any = {}): Promise<void> {
+    try {
+      const embedding = await this.getEmbedding(content);
+      await this.addEmbedding(id, embedding, { ...metadata, content });
+    } catch (error: any) {
+      throw new Error(`Failed to add document ${id}: ${error.message}`);
+    }
+  }
 }

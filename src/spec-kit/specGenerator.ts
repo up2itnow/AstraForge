@@ -121,7 +121,7 @@ export class SpecGenerator {
       functionalRequirements: specSections.functionalRequirements,
       userScenarios: specSections.userScenarios,
       keyEntities: specSections.keyEntities,
-      constitutionCompliance: constitutionCheck
+      constitutionCompliance: constitutionCheck,
     };
   }
 
@@ -155,7 +155,7 @@ export class SpecGenerator {
         actions: ['Use the system'],
         entities: [],
         constraints: [],
-        successCriteria: []
+        successCriteria: [],
       };
     }
   }
@@ -171,14 +171,23 @@ export class SpecGenerator {
 
     // Generate user scenarios using different LLMs for diversity
     sections.userScenarios = await this.generateUserScenarios(parsedIdea, llmProviders[0]);
-    sections.acceptanceScenarios = await this.generateAcceptanceScenarios(parsedIdea, llmProviders[1]);
+    sections.acceptanceScenarios = await this.generateAcceptanceScenarios(
+      parsedIdea,
+      llmProviders[1]
+    );
     sections.edgeCases = await this.generateEdgeCases(parsedIdea, llmProviders[2]);
 
     // Generate functional requirements
-    sections.functionalRequirements = await this.generateFunctionalRequirements(parsedIdea, sections.userScenarios);
+    sections.functionalRequirements = await this.generateFunctionalRequirements(
+      parsedIdea,
+      sections.userScenarios
+    );
 
     // Identify key entities
-    sections.keyEntities = await this.identifyKeyEntities(parsedIdea, sections.functionalRequirements);
+    sections.keyEntities = await this.identifyKeyEntities(
+      parsedIdea,
+      sections.functionalRequirements
+    );
 
     return sections;
   }
@@ -198,7 +207,11 @@ export class SpecGenerator {
     `;
 
     const response = await this.llmManager.generateResponse('openai', prompt);
-    return response.trim().replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').toLowerCase();
+    return response
+      .trim()
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .toLowerCase();
   }
 
   private generateBranchName(featureName: string): string {
@@ -223,7 +236,9 @@ export class SpecGenerator {
       return JSON.parse(response);
     } catch (error) {
       console.error('Error generating user scenarios:', error);
-      return [`As a user, I want to ${parsedIdea.coreFunctionality} so that I can achieve my goals`];
+      return [
+        `As a user, I want to ${parsedIdea.coreFunctionality} so that I can achieve my goals`,
+      ];
     }
   }
 
@@ -274,7 +289,10 @@ export class SpecGenerator {
     }
   }
 
-  private async generateFunctionalRequirements(parsedIdea: any, userScenarios: string[]): Promise<string[]> {
+  private async generateFunctionalRequirements(
+    parsedIdea: any,
+    userScenarios: string[]
+  ): Promise<string[]> {
     const prompt = `
     Generate functional requirements from this analysis:
     
@@ -299,7 +317,10 @@ export class SpecGenerator {
       return JSON.parse(response);
     } catch (error) {
       console.error('Error generating functional requirements:', error);
-      return ['FR-001: System MUST provide core functionality', 'FR-002: Users MUST be able to interact with the system'];
+      return [
+        'FR-001: System MUST provide core functionality',
+        'FR-002: Users MUST be able to interact with the system',
+      ];
     }
   }
 
@@ -361,7 +382,7 @@ export class SpecGenerator {
         passed: true,
         violations: [],
         warnings: [],
-        complexityScore: 5
+        complexityScore: 5,
       };
     }
   }
@@ -393,29 +414,57 @@ export class SpecGenerator {
     }
   }
 
-  private assembleSpecification(request: SpecificationRequest, sections: any, clarifications: string[]): string {
+  private assembleSpecification(
+    request: SpecificationRequest,
+    sections: any,
+    clarifications: string[]
+  ): string {
     const currentDate = new Date().toISOString().split('T')[0];
-    
+
     let spec = this.specTemplate;
-    
+
     // Replace template variables
     spec = spec.replace('{{FEATURE_NAME}}', sections.featureName || 'New Feature');
     spec = spec.replace('{{BRANCH_NAME}}', sections.branchName || '001-new-feature');
     spec = spec.replace('{{DATE}}', currentDate);
     spec = spec.replace('{{USER_INPUT}}', request.userIdea || 'User provided idea');
-    
+
     // Replace content sections
-    spec = spec.replace('{{PRIMARY_USER_STORY}}', sections.userScenarios?.join('\n\n') || 'User story to be defined');
-    spec = spec.replace('{{ACCEPTANCE_SCENARIOS}}', sections.acceptanceScenarios?.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n') || 'Scenarios to be defined');
-    spec = spec.replace('{{EDGE_CASES}}', sections.edgeCases?.map((e: string) => `- ${e}`).join('\n') || 'Edge cases to be identified');
-    spec = spec.replace('{{FUNCTIONAL_REQUIREMENTS}}', sections.functionalRequirements?.map((r: string) => `- **${r}**`).join('\n') || 'Requirements to be defined');
-    spec = spec.replace('{{KEY_ENTITIES}}', sections.keyEntities?.map((e: string) => `- **${e}**`).join('\n') || 'Entities to be identified');
-    spec = spec.replace('{{CLARIFICATIONS_NEEDED}}', clarifications.map(c => `- ${c}`).join('\n') || 'No clarifications needed');
-    
+    spec = spec.replace(
+      '{{PRIMARY_USER_STORY}}',
+      sections.userScenarios?.join('\n\n') || 'User story to be defined'
+    );
+    spec = spec.replace(
+      '{{ACCEPTANCE_SCENARIOS}}',
+      sections.acceptanceScenarios?.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n') ||
+        'Scenarios to be defined'
+    );
+    spec = spec.replace(
+      '{{EDGE_CASES}}',
+      sections.edgeCases?.map((e: string) => `- ${e}`).join('\n') || 'Edge cases to be identified'
+    );
+    spec = spec.replace(
+      '{{FUNCTIONAL_REQUIREMENTS}}',
+      sections.functionalRequirements?.map((r: string) => `- **${r}**`).join('\n') ||
+        'Requirements to be defined'
+    );
+    spec = spec.replace(
+      '{{KEY_ENTITIES}}',
+      sections.keyEntities?.map((e: string) => `- **${e}**`).join('\n') ||
+        'Entities to be identified'
+    );
+    spec = spec.replace(
+      '{{CLARIFICATIONS_NEEDED}}',
+      clarifications.map(c => `- ${c}`).join('\n') || 'No clarifications needed'
+    );
+
     return spec;
   }
 
-  public async refineSpecification(existingSpec: string, refinements: string[]): Promise<GeneratedSpec> {
+  public async refineSpecification(
+    existingSpec: string,
+    refinements: string[]
+  ): Promise<GeneratedSpec> {
     logger.info('Refining specification...');
     const prompt = `
     Refine this existing specification based on user feedback:
@@ -431,10 +480,10 @@ export class SpecGenerator {
     `;
 
     const refinedContent = await this.llmManager.generateResponse('openai', prompt);
-    
+
     // Re-analyze the refined specification
     const analysis = await this.analyzeSpecification(refinedContent);
-    
+
     return {
       title: analysis.title,
       content: refinedContent,
@@ -442,7 +491,7 @@ export class SpecGenerator {
       functionalRequirements: analysis.functionalRequirements,
       userScenarios: analysis.userScenarios,
       keyEntities: analysis.keyEntities,
-      constitutionCompliance: analysis.constitutionCompliance
+      constitutionCompliance: analysis.constitutionCompliance,
     };
   }
 
@@ -480,7 +529,7 @@ export class SpecGenerator {
         functionalRequirements: [],
         userScenarios: [],
         keyEntities: [],
-        constitutionCompliance: { passed: true, violations: [], warnings: [], complexityScore: 5 }
+        constitutionCompliance: { passed: true, violations: [], warnings: [], complexityScore: 5 },
       };
     }
   }

@@ -1,0 +1,74 @@
+# Build outputs
+src/**
+tsconfig.json
+.eslintrc.json
+eslint.config.js
+.prettierrc.json
+.prettierignore
+
+# Tests
+tests/**
+jest.config.js
+coverage/**
+
+# Dependencies
+node_modules/**
+.npm
+
+# Development files
+.env
+.env.example
+example.env
+*.log
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+docs/**
+*.md
+!README.md
+
+# Scripts and tools
+scripts/**
+validate-env.cjs
+setup-env.sh
+setup-env.ps1
+launch_extension.ps1
+start_astraforge.ps1
+
+# Archive and temporary files
+archive/**
+temp_folder/**
+backup/**
+*.tmp
+*.temp
+*.backup
+*.bak
+
+# CI/CD
+.github/**
+.codacy/**
+
+# IDE
+.vscode/**
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# Build artifacts
+*.vsix
+out/test/**
+.nyc_output/
+
+# Memory and specs (development artifacts)
+memory/**
+specs/**
+templates/**
+phased_development_plan.md
+test_prompts.txt
+extraction_log.txt

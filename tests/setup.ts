@@ -29,7 +29,7 @@ const mockFs = {
   readFileSync: jest.fn(),
   writeFileSync: jest.fn(),
   existsSync: jest.fn(() => false),
-  mkdirSync: jest.fn()
+  mkdirSync: jest.fn(),
 };
 
 // Global mocks

@@ -231,11 +231,13 @@ for details.
 
 ---
 
-*"The future of coding is not about replacing developers, but about amplifying human creativity through AI collaboration."* - AstraForge Vision
+_"The future of coding is not about replacing developers, but about amplifying
+human creativity through AI collaboration."_ - AstraForge Vision
 
 ### Line endings
 
-This repository enforces consistent line endings via `.gitattributes`. Most text files use LF; Windows scripts use CRLF.
+This repository enforces consistent line endings via `.gitattributes`. Most text
+files use LF; Windows scripts use CRLF.
 
 ```gitattributes
 * text=auto eol=lf
