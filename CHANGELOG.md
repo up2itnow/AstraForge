@@ -74,29 +74,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Future Releases
-
-### [2.1.0] - Planned
-- Advanced synthesis algorithms
-- Conflict resolution mechanisms
-- Machine learning-based LLM assignment
-- Performance analytics dashboard
-
-### [3.0.0] - Roadmap
-- Cloud collaboration features
-- Team synchronization
-- Enterprise security features
-- VS Code Marketplace release
-=======
-# AstraForge IDE Changelog
-
-All notable changes to the AstraForge IDE extension will be documented in this
-file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [Unreleased]
 
 ### ✨ Features
@@ -157,20 +134,19 @@ and this project adheres to
 - **Configuration**: Improved ESLint, Prettier, and TypeScript configurations
 - **Build Process**: Optimized compilation and packaging workflow
 
-## [0.0.1] - 2024-01-XX
+## Future Releases
 
-### ✨ Features
+### [2.1.0] - Planned
+- Advanced synthesis algorithms
+- Conflict resolution mechanisms
+- Machine learning-based LLM assignment
+- Performance analytics dashboard
 
-- **Initial Release**: Basic VS Code extension structure
-- **Multi-LLM Support**: Basic integration with multiple AI providers
-- **Workflow Management**: Initial phase-based development workflow
-- **Vector Database**: Basic vector storage implementation
-- **Git Integration**: Simple automated commit functionality
-
-### 📚 Documentation
-
-- **README**: Initial project documentation
-- **Basic Setup**: Installation and configuration instructions
+### [3.0.0] - Roadmap
+- Cloud collaboration features
+- Team synchronization
+- Enterprise security features
+- VS Code Marketplace release
 
 ---
 
@@ -240,4 +216,3 @@ contribute:
 _This changelog is maintained automatically by
 [semantic-release](https://github.com/semantic-release/semantic-release) and
 [conventional commits](https://conventionalcommits.org/)._
->>>>>>> f5a255fd08362c17ce5f3d93e13a141f12cd3118
