@@ -12,7 +12,6 @@ import {
   CollaborativeSession, 
   CollaborationRequest, 
   LLMParticipant, 
-  SessionStatus,
   SessionMetrics,
   CollaborationEvent,
   CollaborationError,
@@ -74,8 +73,8 @@ export class CollaborativeSessionManager extends EventEmitter {
 
       this.sessions.set(sessionId, session);
 
-      // Set up session timer
-      const sessionTimerId = this.timeManager.createSessionTimer(
+      // Set up session timer  
+      const _sessionTimerId = this.timeManager.createSessionTimer(
         sessionId,
         session.timeLimit,
         (remaining) => this.handleSessionWarning(sessionId, remaining),
@@ -573,12 +572,12 @@ export class CollaborativeSessionManager extends EventEmitter {
     return Math.ceil(text.length / 4);
   }
 
-  private hasReachedConsensus(session: CollaborativeSession): boolean {
+  private hasReachedConsensus(_session: CollaborativeSession): boolean {
     // TODO: Implement consensus detection logic
     return false;
   }
 
-  private meetsQualityThreshold(session: CollaborativeSession): boolean {
+  private meetsQualityThreshold(_session: CollaborativeSession): boolean {
     // TODO: Implement quality threshold checking
     return false;
   }

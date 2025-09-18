@@ -252,7 +252,7 @@ describe('VectorDB', () => {
 
       expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         path.join(testStoragePath, 'vectordb', 'vectors.json'),
-        expect.stringContaining('"id":"test"')
+        expect.stringContaining('"id": "test"')
       );
     });
 

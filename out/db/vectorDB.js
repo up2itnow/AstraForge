@@ -60,8 +60,14 @@ export class VectorDB {
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
     async save() {
-        const dataPath = path.join(this.storagePath, 'vectors.json');
-        fs.writeFileSync(dataPath, JSON.stringify(this.items, null, 2));
+        try {
+            const dataPath = path.join(this.storagePath, 'vectors.json');
+            fs.writeFileSync(dataPath, JSON.stringify(this.items, null, 2));
+        }
+        catch (error) {
+            console.error('Failed to save vector database:', error);
+            // Don't throw to maintain graceful degradation
+        }
     }
     close() {
         // Cleanup if needed
