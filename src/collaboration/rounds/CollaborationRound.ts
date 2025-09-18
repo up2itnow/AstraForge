@@ -1,17 +1,17 @@
 /**
  * CollaborationRound - Manages individual rounds within a collaborative session
- * 
+ *
  * Each round has a specific purpose (propose, critique, synthesize, validate)
  * and manages the collection and processing of contributions from LLM participants.
  */
 
-import { 
+import {
   CollaborationRound as ICollaborationRound,
   RoundType,
   Contribution,
   RoundOutput,
   LLMParticipant,
-  ConsensusLevel
+  ConsensusLevel,
 } from '../types/collaborationTypes';
 import { logger } from '../../utils/logger';
 
@@ -54,8 +54,10 @@ export class CollaborationRound implements ICollaborationRound {
 
     contribution.roundId = this.id;
     this.contributions.push(contribution);
-    
-    logger.debug(`📝 Added contribution from ${contribution.author.provider} to round ${this.type}`);
+
+    logger.debug(
+      `📝 Added contribution from ${contribution.author.provider} to round ${this.type}`
+    );
   }
 
   /**
@@ -98,7 +100,7 @@ export class CollaborationRound implements ICollaborationRound {
   generateRoundOutput(): RoundOutput {
     const consensusLevel = this.determineConsensusLevel();
     const qualityScore = this.calculateQualityScore();
-    
+
     this.roundOutput = {
       roundId: this.id,
       type: this.type,
@@ -107,7 +109,7 @@ export class CollaborationRound implements ICollaborationRound {
       consensusLevel,
       qualityScore,
       emergenceIndicators: [], // TODO: Implement emergence detection
-      nextRoundRecommendation: this.recommendNextRound()
+      nextRoundRecommendation: this.recommendNextRound(),
     };
 
     return this.roundOutput;
@@ -123,7 +125,7 @@ export class CollaborationRound implements ICollaborationRound {
 
     // Simple implementation - can be enhanced with semantic analysis
     const agreements = this.analyzeAgreements();
-    
+
     if (agreements >= 0.9) {
       return 'unanimous';
     } else if (agreements >= 0.66) {
@@ -186,8 +188,9 @@ export class CollaborationRound implements ICollaborationRound {
     }
 
     // Simple synthesis - can be enhanced with LLM-powered synthesis
-    const contributionSummaries = this.contributions.map((c, _index) => 
-      `**${c.author.provider}** (Confidence: ${c.confidence}%): ${c.content.substring(0, 200)}...`
+    const contributionSummaries = this.contributions.map(
+      (c, _index) =>
+        `**${c.author.provider}** (Confidence: ${c.confidence}%): ${c.content.substring(0, 200)}...`
     );
 
     return `**${this.type.toUpperCase()} ROUND SYNTHESIS**\n\n${contributionSummaries.join('\n\n')}`;
@@ -199,7 +202,7 @@ export class CollaborationRound implements ICollaborationRound {
   private recommendNextRound(): RoundType | undefined {
     const roundSequence: RoundType[] = ['propose', 'critique', 'synthesize', 'validate'];
     const currentIndex = roundSequence.indexOf(this.type);
-    
+
     if (currentIndex < roundSequence.length - 1) {
       return roundSequence[currentIndex + 1];
     }
@@ -247,7 +250,7 @@ export class CollaborationRound implements ICollaborationRound {
       averageConfidence: this.getAverageConfidence(),
       totalTokens: this.getTotalTokenCount(),
       uniqueProviders: new Set(this.contributions.map(c => c.author.provider)).size,
-      qualityScore: this.calculateQualityScore()
+      qualityScore: this.calculateQualityScore(),
     };
   }
 
@@ -257,15 +260,15 @@ export class CollaborationRound implements ICollaborationRound {
   complete(): RoundOutput {
     this.status = 'completed';
     this.endTime = new Date();
-    
+
     const output = this.generateRoundOutput();
-    
+
     logger.info(`✅ Round ${this.type} completed:`);
-    logger.debug(`   Duration: ${Math.round(this.getDuration()/1000)}s`);
+    logger.debug(`   Duration: ${Math.round(this.getDuration() / 1000)}s`);
     logger.debug(`   Contributions: ${this.contributions.length}`);
     logger.debug(`   Quality Score: ${output.qualityScore}`);
     logger.debug(`   Consensus: ${output.consensusLevel}`);
-    
+
     return output;
   }
 
@@ -275,13 +278,13 @@ export class CollaborationRound implements ICollaborationRound {
   timeout(): RoundOutput {
     this.status = 'timeout';
     this.endTime = new Date();
-    
+
     const output = this.generateRoundOutput();
-    
+
     logger.warn(`⏰ Round ${this.type} timed out:`);
     logger.debug(`   Partial contributions: ${this.contributions.length}`);
     logger.debug(`   Quality Score: ${output.qualityScore}`);
-    
+
     return output;
   }
 }

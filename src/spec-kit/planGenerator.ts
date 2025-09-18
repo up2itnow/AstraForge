@@ -144,7 +144,10 @@ export class PlanGenerator {
 `;
   }
 
-  public async generatePlan(spec: GeneratedSpec, technicalRequirements?: Partial<TechnicalContext>): Promise<TechnicalPlan> {
+  public async generatePlan(
+    spec: GeneratedSpec,
+    technicalRequirements?: Partial<TechnicalContext>
+  ): Promise<TechnicalPlan> {
     logger.info('🔧 Generating technical implementation plan...');
 
     // Phase 0: Research and technical context
@@ -175,7 +178,7 @@ export class PlanGenerator {
       projectStructure,
       researchTasks,
       designPhase,
-      taskPlanningApproach
+      taskPlanningApproach,
     });
 
     return {
@@ -186,11 +189,14 @@ export class PlanGenerator {
       researchTasks,
       designPhase,
       taskPlanningApproach,
-      content
+      content,
     };
   }
 
-  private async determineTechnicalContext(spec: GeneratedSpec, requirements?: Partial<TechnicalContext>): Promise<TechnicalContext> {
+  private async determineTechnicalContext(
+    spec: GeneratedSpec,
+    requirements?: Partial<TechnicalContext>
+  ): Promise<TechnicalContext> {
     const prompt = `
     Determine the technical context for this feature specification:
     
@@ -220,18 +226,22 @@ export class PlanGenerator {
     try {
       const response = await this.llmManager.generateResponse('openai', prompt);
       const context = JSON.parse(response);
-      
+
       // Merge with provided requirements
       return {
         language: requirements?.language || context.language || 'TypeScript 5.1',
-        primaryDependencies: requirements?.primaryDependencies || context.primaryDependencies || ['Node.js'],
+        primaryDependencies: requirements?.primaryDependencies ||
+          context.primaryDependencies || ['Node.js'],
         storage: requirements?.storage || context.storage || 'File System',
         testing: requirements?.testing || context.testing || 'Jest',
-        targetPlatform: requirements?.targetPlatform || context.targetPlatform || 'VS Code Extension',
+        targetPlatform:
+          requirements?.targetPlatform || context.targetPlatform || 'VS Code Extension',
         projectType: requirements?.projectType || context.projectType || 'single',
-        performanceGoals: requirements?.performanceGoals || context.performanceGoals || ['Responsive UI'],
-        constraints: requirements?.constraints || context.constraints || ['VS Code API limitations'],
-        scale: requirements?.scale || context.scale || 'Single user workspace'
+        performanceGoals: requirements?.performanceGoals ||
+          context.performanceGoals || ['Responsive UI'],
+        constraints: requirements?.constraints ||
+          context.constraints || ['VS Code API limitations'],
+        scale: requirements?.scale || context.scale || 'Single user workspace',
       };
     } catch (error) {
       logger.error('Error determining technical context:', error);
@@ -244,12 +254,15 @@ export class PlanGenerator {
         projectType: 'single',
         performanceGoals: ['Responsive UI', '<100ms response time'],
         constraints: ['VS Code API limitations', 'Single workspace context'],
-        scale: 'Single user workspace'
+        scale: 'Single user workspace',
       };
     }
   }
 
-  private async generateResearchTasks(spec: GeneratedSpec, context: TechnicalContext): Promise<ResearchTask[]> {
+  private async generateResearchTasks(
+    spec: GeneratedSpec,
+    context: TechnicalContext
+  ): Promise<ResearchTask[]> {
     const prompt = `
     Generate research tasks for this technical plan:
     
@@ -283,13 +296,16 @@ export class PlanGenerator {
           id: 'R001',
           description: 'Research best practices for VS Code extension development',
           rationale: 'Ensure optimal user experience and performance',
-          alternatives: ['Basic implementation', 'Advanced optimization', 'Minimal viable product']
-        }
+          alternatives: ['Basic implementation', 'Advanced optimization', 'Minimal viable product'],
+        },
       ];
     }
   }
 
-  private async performConstitutionCheck(spec: GeneratedSpec, context: TechnicalContext): Promise<ConstitutionCheck> {
+  private async performConstitutionCheck(
+    spec: GeneratedSpec,
+    context: TechnicalContext
+  ): Promise<ConstitutionCheck> {
     const prompt = `
     Perform constitution compliance check for this plan:
     
@@ -339,32 +355,32 @@ export class PlanGenerator {
           projectCount: 1,
           usingFrameworkDirectly: true,
           singleDataModel: true,
-          avoidingPatterns: true
+          avoidingPatterns: true,
         },
         architecture: {
           everyFeatureAsLibrary: true,
           libraries: [{ name: spec.title, purpose: 'Core functionality' }],
           cliPerLibrary: [`${spec.title.toLowerCase()}`],
-          libraryDocsPlanned: true
+          libraryDocsPlanned: true,
         },
         testing: {
           redGreenRefactorEnforced: true,
           gitCommitsShowTestsFirst: true,
           orderFollowed: true,
           realDependenciesUsed: true,
-          integrationTestsPlanned: true
+          integrationTestsPlanned: true,
         },
         observability: {
           structuredLoggingIncluded: true,
           frontendToBackendLogs: false,
-          errorContextSufficient: true
+          errorContextSufficient: true,
         },
         versioning: {
           versionAssigned: '1.0.0',
           buildIncrementsPlanned: true,
-          breakingChangesHandled: true
+          breakingChangesHandled: true,
         },
-        violations: []
+        violations: [],
       };
     }
   }
@@ -382,9 +398,9 @@ export class PlanGenerator {
           'tests/',
           'tests/contract/',
           'tests/integration/',
-          'tests/unit/'
+          'tests/unit/',
         ],
-        description: 'Single project structure for focused functionality'
+        description: 'Single project structure for focused functionality',
       },
       web: {
         type: 'web' as const,
@@ -400,28 +416,24 @@ export class PlanGenerator {
           'frontend/src/components/',
           'frontend/src/pages/',
           'frontend/src/services/',
-          'frontend/tests/'
+          'frontend/tests/',
         ],
-        description: 'Web application with separate frontend and backend'
+        description: 'Web application with separate frontend and backend',
       },
       mobile: {
         type: 'mobile' as const,
-        directories: [
-          'api/',
-          'api/src/',
-          'api/tests/',
-          'mobile/',
-          'mobile/src/',
-          'mobile/tests/'
-        ],
-        description: 'Mobile application with API backend'
-      }
+        directories: ['api/', 'api/src/', 'api/tests/', 'mobile/', 'mobile/src/', 'mobile/tests/'],
+        description: 'Mobile application with API backend',
+      },
     };
 
     return structures[context.projectType] || structures.single;
   }
 
-  private async planDesignPhase(spec: GeneratedSpec, context: TechnicalContext): Promise<DesignPhase> {
+  private async planDesignPhase(
+    spec: GeneratedSpec,
+    context: TechnicalContext
+  ): Promise<DesignPhase> {
     const prompt = `
     Plan the design phase for this feature:
     
@@ -451,12 +463,15 @@ export class PlanGenerator {
         apiContracts: ['API contracts to be generated from functional requirements'],
         contractTests: ['Contract tests to be created for each endpoint'],
         testScenarios: ['Integration test scenarios from user stories'],
-        quickstart: 'Quickstart guide with validation steps'
+        quickstart: 'Quickstart guide with validation steps',
       };
     }
   }
 
-  private async defineTaskPlanningApproach(spec: GeneratedSpec, designPhase: DesignPhase): Promise<string> {
+  private async defineTaskPlanningApproach(
+    spec: GeneratedSpec,
+    designPhase: DesignPhase
+  ): Promise<string> {
     const prompt = `
     Define the task planning approach for this feature:
     
@@ -516,16 +531,25 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
 
   private assemblePlan(data: any): string {
     const currentDate = new Date().toISOString().split('T')[0];
-    
+
     let plan = this.planTemplate;
-    
+
     // Replace template variables
     plan = plan.replace(/\{\{FEATURE_NAME\}\}/g, data.spec.title);
-    plan = plan.replace(/\{\{BRANCH_NAME\}\}/g, `001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}`);
+    plan = plan.replace(
+      /\{\{BRANCH_NAME\}\}/g,
+      `001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}`
+    );
     plan = plan.replace(/\{\{DATE\}\}/g, currentDate);
-    plan = plan.replace(/\{\{SPEC_LINK\}\}/g, `specs/001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}/spec.md`);
-    plan = plan.replace(/\{\{FEATURE_DIR\}\}/g, `001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}`);
-    
+    plan = plan.replace(
+      /\{\{SPEC_LINK\}\}/g,
+      `specs/001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}/spec.md`
+    );
+    plan = plan.replace(
+      /\{\{FEATURE_DIR\}\}/g,
+      `001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}`
+    );
+
     // Replace content sections
     plan = plan.replace('{{SUMMARY}}', data.summary);
     plan = plan.replace('{{LANGUAGE}}', data.technicalContext.language);
@@ -537,30 +561,30 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
     plan = plan.replace('{{PERFORMANCE_GOALS}}', data.technicalContext.performanceGoals.join(', '));
     plan = plan.replace('{{CONSTRAINTS}}', data.technicalContext.constraints.join(', '));
     plan = plan.replace('{{SCALE}}', data.technicalContext.scale);
-    
+
     // Constitution check
     const constitutionSection = this.formatConstitutionCheck(data.constitutionCheck);
     plan = plan.replace('{{CONSTITUTION_CHECK}}', constitutionSection);
-    
+
     // Project structure
     const structureSection = this.formatProjectStructure(data.projectStructure);
     plan = plan.replace('{{PROJECT_STRUCTURE}}', structureSection);
-    
+
     // Research phase
     const researchSection = this.formatResearchPhase(data.researchTasks);
     plan = plan.replace('{{RESEARCH_PHASE}}', researchSection);
-    
+
     // Design phase
     const designSection = this.formatDesignPhase(data.designPhase);
     plan = plan.replace('{{DESIGN_PHASE}}', designSection);
-    
+
     // Task planning
     plan = plan.replace('{{TASK_PLANNING}}', data.taskPlanningApproach);
-    
+
     // Progress tracking
     const progressSection = this.formatProgressTracking();
     plan = plan.replace('{{PROGRESS_TRACKING}}', progressSection);
-    
+
     return plan;
   }
 
@@ -570,25 +594,25 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
     section += `- Using framework directly: ${check.simplicity.usingFrameworkDirectly ? 'Yes' : 'No'}\n`;
     section += `- Single data model: ${check.simplicity.singleDataModel ? 'Yes' : 'No'}\n`;
     section += `- Avoiding patterns: ${check.simplicity.avoidingPatterns ? 'Yes' : 'No'}\n\n`;
-    
+
     section += '**Architecture**:\n';
     section += `- Every feature as library: ${check.architecture.everyFeatureAsLibrary ? 'Yes' : 'No'}\n`;
     section += `- Libraries: ${check.architecture.libraries.map(l => `${l.name} (${l.purpose})`).join(', ')}\n`;
     section += `- CLI per library: ${check.architecture.cliPerLibrary.join(', ')}\n`;
     section += `- Library docs planned: ${check.architecture.libraryDocsPlanned ? 'Yes' : 'No'}\n\n`;
-    
+
     section += '**Testing (NON-NEGOTIABLE)**:\n';
     section += `- RED-GREEN-Refactor enforced: ${check.testing.redGreenRefactorEnforced ? 'Yes' : 'No'}\n`;
     section += `- Tests before implementation: ${check.testing.gitCommitsShowTestsFirst ? 'Yes' : 'No'}\n`;
     section += `- Order followed: ${check.testing.orderFollowed ? 'Yes' : 'No'}\n`;
     section += `- Real dependencies: ${check.testing.realDependenciesUsed ? 'Yes' : 'No'}\n`;
     section += `- Integration tests: ${check.testing.integrationTestsPlanned ? 'Yes' : 'No'}\n\n`;
-    
+
     if (check.violations.length > 0) {
       section += '**Violations**:\n';
       section += check.violations.map(v => `- ${v}`).join('\n');
     }
-    
+
     return section;
   }
 
@@ -652,9 +676,9 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
 
   public async executeResearch(tasks: ResearchTask[]): Promise<ResearchTask[]> {
     logger.info('🔍 Executing research tasks...');
-    
+
     const completedTasks = await Promise.all(
-      tasks.map(async (task) => {
+      tasks.map(async task => {
         const prompt = `
         Research this topic:
         
@@ -670,23 +694,23 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
         
         Focus on practical, actionable insights for VS Code extension development.
         `;
-        
+
         try {
           const research = await this.llmManager.generateResponse('openai', prompt);
           return {
             ...task,
-            decision: research
+            decision: research,
           };
         } catch (error) {
           logger.error(`Error researching task ${task.id}:`, error);
           return {
             ...task,
-            decision: 'Research pending - manual investigation required'
+            decision: 'Research pending - manual investigation required',
           };
         }
       })
     );
-    
+
     return completedTasks;
   }
 }

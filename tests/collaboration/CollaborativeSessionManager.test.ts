@@ -19,18 +19,19 @@ jest.mock('vscode', () => ({
     getConfiguration: jest.fn(() => ({
       get: jest.fn((key: string) => {
         if (key === 'llmPanel') {
-          const models = process.env.OPENROUTER_MODELS_TO_USE?.split(',').map(model => model.trim()) || [];
+          const models =
+            process.env.OPENROUTER_MODELS_TO_USE?.split(',').map(model => model.trim()) || [];
           return models.map((model, index) => ({
             provider: 'OpenRouter',
             key: process.env.OPENROUTER_API_KEY,
             model: model,
-            role: index === 0 ? 'primary' : 'secondary'
+            role: index === 0 ? 'primary' : 'secondary',
           }));
         }
         return [];
-      })
-    }))
-  }
+      }),
+    })),
+  },
 }));
 
 describe('CollaborativeSessionManager Integration', () => {
@@ -59,7 +60,7 @@ describe('CollaborativeSessionManager Integration', () => {
     if (vectorDB) {
       vectorDB.close();
     }
-    
+
     // Clean up test data
     if (fs.existsSync(testStoragePath)) {
       fs.rmSync(testStoragePath, { recursive: true, force: true });
@@ -72,11 +73,11 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: 'Design a REST API for a task management system',
         priority: 'high',
         timeLimit: 60000, // 60 seconds in milliseconds
-        preferredParticipants: ['OpenAI', 'Anthropic']
+        preferredParticipants: ['OpenAI', 'Anthropic'],
       };
 
       const session = await sessionManager.startSession(request);
-      
+
       expect(session).toBeDefined();
       expect(session.id).toBeDefined();
       expect(session.status).toBe('active');
@@ -88,7 +89,7 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: '', // Empty prompt should fail validation
         priority: 'high',
         timeLimit: 5, // Too short time limit
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       await expect(sessionManager.startSession(invalidRequest)).rejects.toThrow();
@@ -99,11 +100,11 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: 'Evaluate the pros and cons of microservices architecture',
         priority: 'medium',
         timeLimit: 120000, // 120 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await sessionManager.startSession(request);
-      
+
       expect(session.participants.length).toBeGreaterThanOrEqual(2);
       session.participants.forEach(participant => {
         expect(participant.id).toBeDefined();
@@ -120,17 +121,18 @@ describe('CollaborativeSessionManager Integration', () => {
       }
 
       const request: CollaborationRequest = {
-        prompt: 'What are the key considerations for implementing user authentication in a web application? Please provide concise responses.',
+        prompt:
+          'What are the key considerations for implementing user authentication in a web application? Please provide concise responses.',
         priority: 'high',
         timeLimit: 90000, // 90 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await sessionManager.startSession(request);
-      
+
       // Execute the collaborative rounds with real API calls
       await sessionManager.executeSessionRounds(session.id);
-      
+
       // Verify session completed
       expect(['completed', 'consensus_reached']).toContain(session.status);
       expect(session.rounds.length).toBeGreaterThan(0);
@@ -143,17 +145,18 @@ describe('CollaborativeSessionManager Integration', () => {
       }
 
       const request: CollaborationRequest = {
-        prompt: 'Compare React and Vue.js for building a dashboard application. Keep responses brief.',
+        prompt:
+          'Compare React and Vue.js for building a dashboard application. Keep responses brief.',
         priority: 'medium',
         timeLimit: 60000, // 60 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await sessionManager.startSession(request);
       await sessionManager.executeSessionRounds(session.id);
-      
+
       const result = await sessionManager.completeSession(session.id);
-      
+
       expect(result).toBeDefined();
       expect(result.synthesisLog).toBeDefined();
       expect(Array.isArray(result.synthesisLog)).toBe(true);
@@ -172,17 +175,19 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: 'Explain the benefits of automated testing in software development. Be concise.',
         priority: 'medium',
         timeLimit: 45000, // 45 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await sessionManager.startSession(request);
       await sessionManager.executeSessionRounds(session.id);
-      
+
       const result = await sessionManager.completeSession(session.id);
-      
+
       expect(result.qualityScore).toBeGreaterThan(0);
       expect(result.qualityScore).toBeLessThanOrEqual(100);
-      expect(typeof result.consensusLevel === 'number' || typeof result.consensusLevel === 'string').toBe(true);
+      expect(
+        typeof result.consensusLevel === 'number' || typeof result.consensusLevel === 'string'
+      ).toBe(true);
     }, 75000);
 
     it('should measure consensus between real LLM responses', async () => {
@@ -195,19 +200,24 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: 'What is 2 + 2? This should have high consensus.',
         priority: 'low',
         timeLimit: 30000, // 30 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await sessionManager.startSession(request);
       await sessionManager.executeSessionRounds(session.id);
-      
+
       const result = await sessionManager.completeSession(session.id);
-      
+
       // Accept either a numeric score or qualitative label
       if (typeof result.consensusLevel === 'number') {
         expect(result.consensusLevel).toBeGreaterThan(0.5);
       } else {
-        expect(['unanimous', 'qualified_majority', 'simple_majority', 'forced_consensus']).toContain(result.consensusLevel);
+        expect([
+          'unanimous',
+          'qualified_majority',
+          'simple_majority',
+          'forced_consensus',
+        ]).toContain(result.consensusLevel);
       }
     }, 45000);
   });
@@ -218,16 +228,16 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: 'Test prompt for time management',
         priority: 'medium',
         timeLimit: 15000, // 15 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const startTime = Date.now();
       const session = await sessionManager.startSession(request);
-      
+
       // Session should be created but not exceed time limit when executed
       expect(session).toBeDefined();
       expect(session.timeLimit).toBe(15000);
-      
+
       const creationTime = Date.now() - startTime;
       expect(creationTime).toBeLessThan(5000); // Session creation should be fast
     });
@@ -237,11 +247,11 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: 'Test duration tracking',
         priority: 'low',
         timeLimit: 30000, // 30 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await sessionManager.startSession(request);
-      
+
       expect(session.startTime).toBeDefined();
       expect(session.startTime).toBeInstanceOf(Date);
     });
@@ -252,30 +262,34 @@ describe('CollaborativeSessionManager Integration', () => {
       // Test with invalid API key
       const originalKey = process.env.OPENROUTER_API_KEY;
       process.env.OPENROUTER_API_KEY = 'invalid-key';
-      
+
       const invalidLLMManager = new LLMManager();
-      const invalidSessionManager = new CollaborativeSessionManager(invalidLLMManager, vectorDB, true);
-      
+      const invalidSessionManager = new CollaborativeSessionManager(
+        invalidLLMManager,
+        vectorDB,
+        true
+      );
+
       const request: CollaborationRequest = {
         prompt: 'This should fail with invalid API key',
         priority: 'medium',
         timeLimit: 30000, // 30 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await invalidSessionManager.startSession(request);
-      
+
       // Should create session but fail during execution
       expect(session).toBeDefined();
-      
+
       // Restore original key
       process.env.OPENROUTER_API_KEY = originalKey;
     }, 15000);
 
     it('should emit error events for failed operations', async () => {
       let errorEmitted = false;
-      
-      sessionManager.on('error', (error) => {
+
+      sessionManager.on('error', error => {
         errorEmitted = true;
         expect(error).toBeDefined();
       });
@@ -286,7 +300,7 @@ describe('CollaborativeSessionManager Integration', () => {
           prompt: '', // Invalid empty prompt
           priority: 'high',
           timeLimit: 5, // Invalid short time
-          preferredParticipants: []
+          preferredParticipants: [],
         });
       } catch (error) {
         // Expected to throw
@@ -302,12 +316,12 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: 'Test data persistence in vector DB',
         priority: 'medium',
         timeLimit: 30000, // 30 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await sessionManager.startSession(request);
       const result = await sessionManager.completeSession(session.id);
-      
+
       // Verify data was stored (basic check)
       expect(result).toBeDefined();
       expect(vectorDB).toBeDefined();
@@ -318,18 +332,22 @@ describe('CollaborativeSessionManager Integration', () => {
       const invalidVectorDB = new VectorDB('/invalid/path');
       await invalidVectorDB.init(); // This should not throw
 
-      const invalidSessionManager = new CollaborativeSessionManager(llmManager, invalidVectorDB, true);
-      
+      const invalidSessionManager = new CollaborativeSessionManager(
+        llmManager,
+        invalidVectorDB,
+        true
+      );
+
       const request: CollaborationRequest = {
         prompt: 'Test with invalid vector DB',
         priority: 'medium',
         timeLimit: 30000, // 30 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       // Should not throw even with invalid vector DB
       await expect(invalidSessionManager.startSession(request)).resolves.toBeDefined();
-      
+
       invalidVectorDB.close();
     });
   });
@@ -341,20 +359,20 @@ describe('CollaborativeSessionManager Integration', () => {
           prompt: 'Concurrent test 1: What is JavaScript?',
           priority: 'low' as const,
           timeLimit: 30000, // 30 seconds in milliseconds
-          preferredParticipants: []
+          preferredParticipants: [],
         },
         {
           prompt: 'Concurrent test 2: What is Python?',
           priority: 'low' as const,
           timeLimit: 30000, // 30 seconds in milliseconds
-          preferredParticipants: []
+          preferredParticipants: [],
         },
         {
           prompt: 'Concurrent test 3: What is TypeScript?',
           priority: 'low' as const,
           timeLimit: 30000, // 30 seconds in milliseconds
-          preferredParticipants: []
-        }
+          preferredParticipants: [],
+        },
       ];
 
       const startTime = Date.now();
@@ -368,7 +386,7 @@ describe('CollaborativeSessionManager Integration', () => {
         expect(session).toBeDefined();
         expect(session.id).toBeDefined();
       });
-      
+
       // Concurrent session creation should be efficient
       expect(duration).toBeLessThan(10000);
     }, 15000);
@@ -383,13 +401,13 @@ describe('CollaborativeSessionManager Integration', () => {
         prompt: 'Brief question: What is REST?', // Short prompt to minimize token usage
         priority: 'medium',
         timeLimit: 45000, // 45 seconds in milliseconds
-        preferredParticipants: []
+        preferredParticipants: [],
       };
 
       const session = await sessionManager.startSession(request);
       await sessionManager.executeSessionRounds(session.id);
       const result = await sessionManager.completeSession(session.id);
-      
+
       expect(result.tokenUsage).toBeDefined();
       expect(result.tokenUsage.totalTokens).toBeGreaterThan(0);
       expect(result.tokenUsage.efficiency).toBeGreaterThan(0);

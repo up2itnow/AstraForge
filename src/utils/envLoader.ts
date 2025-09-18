@@ -12,42 +12,42 @@ export interface EnvConfig {
   ANTHROPIC_API_KEY?: string;
   XAI_API_KEY?: string;
   HUGGINGFACE_API_TOKEN?: string;
-  
+
   // Model Configuration
   OPENROUTER_MODELS_TO_USE?: string;
-  
+
   // AstraForge Configuration
   DEFAULT_LLM_PROVIDER?: string;
   AUTO_COMMIT_ENABLED?: string;
   VECTOR_DB_PATH?: string;
   DEBUG_MODE?: string;
-  
+
   // Spec-Driven Development
   ENFORCE_CONSTITUTION?: string;
   MIN_TEST_COVERAGE?: string;
   ENABLE_PARALLEL_TASKS?: string;
-  
+
   // Security Settings
   USE_SECURE_STORAGE?: string;
   API_TIMEOUT?: string;
   MAX_TOKENS_PER_REQUEST?: string;
-  
+
   // Usage and Monitoring
   TRACK_API_USAGE?: string;
   DAILY_BUDGET_LIMIT?: string;
   ENABLE_PERFORMANCE_MONITORING?: string;
-  
+
   // Collaboration Server
   ENABLE_COLLABORATION_SERVER?: string;
   COLLABORATION_SERVER_PORT?: string;
-  
+
   // Development Preferences
   DEFAULT_LANGUAGE?: string;
   DEFAULT_TESTING_FRAMEWORK?: string;
   DEFAULT_PROJECT_TYPE?: string;
   AUTO_FORMAT_CODE?: string;
   AUTO_ORGANIZE_IMPORTS?: string;
-  
+
   // UI Preferences
   SHOW_INLINE_SUGGESTIONS?: string;
   ENABLE_SYNTAX_HIGHLIGHTING?: string;
@@ -64,7 +64,7 @@ export class EnvLoader {
 
   private loadEnvFile(): void {
     const envPath = path.join(this.projectRoot, '.env');
-    
+
     if (!fs.existsSync(envPath)) {
       logger.warn('No .env file found. Using system environment variables only.');
       return;
@@ -76,7 +76,7 @@ export class EnvLoader {
 
       for (const line of lines) {
         const trimmedLine = line.trim();
-        
+
         // Skip empty lines and comments
         if (!trimmedLine || trimmedLine.startsWith('#')) {
           continue;
@@ -137,9 +137,11 @@ export class EnvLoader {
     if (!apiKey) {
       throw new Error('Missing API key in .env file. Please ensure OPENROUTER_API_KEY is set.');
     }
-    
+
     if (models.length < 3) {
-      throw new Error(`Insufficient models in .env file. Found ${models.length}, need 3. Please check OPENROUTER_MODELS_TO_USE format.`);
+      throw new Error(
+        `Insufficient models in .env file. Found ${models.length}, need 3. Please check OPENROUTER_MODELS_TO_USE format.`
+      );
     }
 
     return [
@@ -147,20 +149,20 @@ export class EnvLoader {
         provider: 'OpenRouter' as const,
         apiKey,
         model: models[0], // x-ai/grok-4
-        role: 'concept'
+        role: 'concept',
       },
       {
-        provider: 'OpenRouter' as const, 
+        provider: 'OpenRouter' as const,
         apiKey,
         model: models[1], // google/gemini-2.5-pro
-        role: 'development'
+        role: 'development',
       },
       {
         provider: 'OpenRouter' as const,
         apiKey,
         model: models[2], // anthropic/claude-sonnet-4
-        role: 'coding'
-      }
+        role: 'coding',
+      },
     ];
   }
 
@@ -179,7 +181,7 @@ export class EnvLoader {
 
     return {
       valid: missing.length === 0,
-      missing
+      missing,
     };
   }
 
@@ -330,7 +332,7 @@ export class EnvLoader {
       debugMode: this.isDebugMode(),
       autoCommit: this.isAutoCommitEnabled(),
       constitutionEnforced: this.isConstitutionEnforced(),
-      testCoverage: this.getMinTestCoverage()
+      testCoverage: this.getMinTestCoverage(),
     };
   }
 }

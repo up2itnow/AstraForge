@@ -43,19 +43,15 @@ export class SpecKitManager {
   private workflows: Map<string, SpecKitWorkflow> = new Map();
   private config: SpecKitConfig;
 
-  constructor(
-    llmManager: LLMManager,
-    vectorDB: VectorDB,
-    gitManager: GitManager
-  ) {
+  constructor(llmManager: LLMManager, vectorDB: VectorDB, gitManager: GitManager) {
     this.llmManager = llmManager;
     this.vectorDB = vectorDB;
     this.gitManager = gitManager;
-    
+
     this.specGenerator = new SpecGenerator(llmManager, vectorDB);
     this.planGenerator = new PlanGenerator(llmManager, vectorDB);
     this.taskGenerator = new TaskGenerator(llmManager, vectorDB);
-    
+
     this.config = this.loadConfig();
   }
 
@@ -68,14 +64,14 @@ export class SpecKitManager {
       defaultTechStack: {
         language: workspaceConfig.get('defaultLanguage', 'TypeScript'),
         framework: workspaceConfig.get('defaultFramework', 'Node.js'),
-        testing: workspaceConfig.get('defaultTesting', 'Jest')
-      }
+        testing: workspaceConfig.get('defaultTesting', 'Jest'),
+      },
     };
   }
 
   public async initializeSpecKit(workspaceDir: string): Promise<void> {
     logger.info('Initializing Spec Kit...');
-    
+
     const specsDir = path.join(workspaceDir, 'specs');
     const templatesDir = path.join(workspaceDir, 'templates');
     const scriptsDir = path.join(workspaceDir, 'scripts');
@@ -83,20 +79,23 @@ export class SpecKitManager {
 
     // Create directory structure
     await this.createDirectoryStructure([specsDir, templatesDir, scriptsDir, memoryDir]);
-    
+
     // Copy templates from spec-kit
     await this.copySpecKitTemplates(templatesDir);
-    
+
     // Copy scripts
     await this.copySpecKitScripts(scriptsDir);
-    
+
     // Create AstraForge constitution
     await this.createAstraForgeConstitution(memoryDir);
-    
+
     // Initialize git if not already initialized
     if (this.config.autoCommit) {
       await this.gitManager.initRepo(workspaceDir);
-      await this.gitManager.addAndCommit(['specs/', 'templates/', 'scripts/', 'memory/'], 'Initialize Spec Kit structure');
+      await this.gitManager.addAndCommit(
+        ['specs/', 'templates/', 'scripts/', 'memory/'],
+        'Initialize Spec Kit structure'
+      );
     }
 
     vscode.window.showInformationMessage('✅ Spec Kit initialized successfully!');
@@ -104,15 +103,19 @@ export class SpecKitManager {
 
   public async createSpecification(request: SpecificationRequest): Promise<string> {
     logger.info('SpecKit: createSpecification');
-    
+
     // Generate specification
     const spec = await this.specGenerator.generateSpecification(request);
-    
+
     // Create workflow
     const workflowId = this.generateWorkflowId();
     const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-    const specsDir = path.join(workspaceDir, 'specs', `${workflowId}-${spec.title.toLowerCase().replace(/\s+/g, '-')}`);
-    
+    const specsDir = path.join(
+      workspaceDir,
+      'specs',
+      `${workflowId}-${spec.title.toLowerCase().replace(/\s+/g, '-')}`
+    );
+
     const workflow: SpecKitWorkflow = {
       id: workflowId,
       featureName: spec.title,
@@ -121,35 +124,38 @@ export class SpecKitManager {
       workspaceDir,
       specsDir,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
+
     this.workflows.set(workflowId, workflow);
-    
+
     // Create spec directory and save specification
     await this.createDirectoryStructure([specsDir]);
     const specPath = path.join(specsDir, 'spec.md');
     await fs.promises.writeFile(specPath, spec.content, 'utf8');
-    
+
     // Save to vector DB for context
     await this.vectorDB.addDocument(`spec-${workflowId}`, spec.content, {
       type: 'specification',
       workflowId,
-      featureName: spec.title
+      featureName: spec.title,
     });
-    
+
     // Auto-commit if enabled
     if (this.config.autoCommit) {
       await this.gitManager.addAndCommit([specPath], `Add specification: ${spec.title}`);
     }
-    
+
     // Show results to user
     await this.showSpecificationResults(workflow);
-    
+
     return workflowId;
   }
 
-  public async createImplementationPlan(workflowId: string, technicalRequirements?: any): Promise<void> {
+  public async createImplementationPlan(
+    workflowId: string,
+    technicalRequirements?: any
+  ): Promise<void> {
     logger.info('SpecKit: createImplementationPlan');
     const workflow = this.workflows.get(workflowId);
     if (!workflow || !workflow.spec) {
@@ -158,47 +164,55 @@ export class SpecKitManager {
 
     // Generate technical plan
     const plan = await this.planGenerator.generatePlan(workflow.spec, technicalRequirements);
-    
+
     // Execute research tasks
     const completedResearch = await this.planGenerator.executeResearch(plan.researchTasks);
     plan.researchTasks = completedResearch;
-    
+
     // Update workflow
     workflow.plan = plan;
     workflow.status = 'planning';
     workflow.updatedAt = new Date();
-    
+
     // Save plan documents
     const planPath = path.join(workflow.specsDir, 'plan.md');
     const researchPath = path.join(workflow.specsDir, 'research.md');
     const dataModelPath = path.join(workflow.specsDir, 'data-model.md');
     const contractsDir = path.join(workflow.specsDir, 'contracts');
-    
+
     await fs.promises.writeFile(planPath, plan.content, 'utf8');
-    await fs.promises.writeFile(researchPath, this.formatResearchResults(plan.researchTasks), 'utf8');
+    await fs.promises.writeFile(
+      researchPath,
+      this.formatResearchResults(plan.researchTasks),
+      'utf8'
+    );
     await fs.promises.writeFile(dataModelPath, plan.designPhase.dataModel, 'utf8');
-    
+
     // Create contracts directory and files
     await this.createDirectoryStructure([contractsDir]);
     for (const contract of plan.designPhase.apiContracts) {
-      const contractPath = path.join(contractsDir, `${contract.toLowerCase().replace(/\s+/g, '-')}.json`);
+      const contractPath = path.join(
+        contractsDir,
+        `${contract.toLowerCase().replace(/\s+/g, '-')}.json`
+      );
       await fs.promises.writeFile(contractPath, JSON.stringify({ contract }, null, 2), 'utf8');
     }
-    
+
     // Save to vector DB
     await this.vectorDB.addDocument(`plan-${workflowId}`, plan.content, {
       type: 'plan',
       workflowId,
-      featureName: workflow.featureName
+      featureName: workflow.featureName,
     });
-    
+
     // Auto-commit if enabled
     if (this.config.autoCommit) {
-      await this.gitManager.addAndCommit([
-        planPath, researchPath, dataModelPath, contractsDir
-      ], `Add implementation plan: ${workflow.featureName}`);
+      await this.gitManager.addAndCommit(
+        [planPath, researchPath, dataModelPath, contractsDir],
+        `Add implementation plan: ${workflow.featureName}`
+      );
     }
-    
+
     // Show results
     await this.showPlanResults(workflow);
   }
@@ -212,41 +226,42 @@ export class SpecKitManager {
 
     // Generate task list
     const taskList = await this.taskGenerator.generateTasks(workflow.plan);
-    
+
     // Validate tasks
     const validation = await this.taskGenerator.validateTasks(taskList);
     if (!validation.valid) {
       const proceed = await vscode.window.showWarningMessage(
         `Task validation found issues:\n${validation.issues.join('\n')}\n\nProceed anyway?`,
-        'Proceed', 'Fix Issues'
+        'Proceed',
+        'Fix Issues'
       );
-      
+
       if (proceed !== 'Proceed') {
         return;
       }
     }
-    
+
     // Update workflow
     workflow.tasks = taskList;
     workflow.status = 'tasks';
     workflow.updatedAt = new Date();
-    
+
     // Save tasks
     const tasksPath = path.join(workflow.specsDir, 'tasks.md');
     await fs.promises.writeFile(tasksPath, taskList.content, 'utf8');
-    
+
     // Save to vector DB
     await this.vectorDB.addDocument(`tasks-${workflowId}`, taskList.content, {
       type: 'tasks',
       workflowId,
-      featureName: workflow.featureName
+      featureName: workflow.featureName,
     });
-    
+
     // Auto-commit if enabled
     if (this.config.autoCommit) {
       await this.gitManager.addAndCommit([tasksPath], `Add task list: ${workflow.featureName}`);
     }
-    
+
     // Show results
     await this.showTaskResults(workflow);
   }
@@ -258,28 +273,34 @@ export class SpecKitManager {
     }
 
     // Refine specification
-    const refinedSpec = await this.specGenerator.refineSpecification(workflow.spec.content, refinements);
-    
+    const refinedSpec = await this.specGenerator.refineSpecification(
+      workflow.spec.content,
+      refinements
+    );
+
     // Update workflow
     workflow.spec = refinedSpec;
     workflow.updatedAt = new Date();
-    
+
     // Save refined specification
     const specPath = path.join(workflow.specsDir, 'spec.md');
     await fs.promises.writeFile(specPath, refinedSpec.content, 'utf8');
-    
+
     // Update vector DB
     await this.vectorDB.addDocument(`spec-${workflowId}`, refinedSpec.content, {
       type: 'specification',
       workflowId,
-      featureName: refinedSpec.title
+      featureName: refinedSpec.title,
     });
-    
+
     // Auto-commit if enabled
     if (this.config.autoCommit) {
-      await this.gitManager.addAndCommit([specPath], `Refine specification: ${workflow.featureName}`);
+      await this.gitManager.addAndCommit(
+        [specPath],
+        `Refine specification: ${workflow.featureName}`
+      );
     }
-    
+
     vscode.window.showInformationMessage('✅ Specification refined successfully!');
   }
 
@@ -305,18 +326,18 @@ export class SpecKitManager {
 
   private async copySpecKitTemplates(templatesDir: string): Promise<void> {
     const sourceTemplatesDir = path.join(__dirname, '../../temp_spec_kit/templates');
-    
+
     try {
       const templates = await fs.promises.readdir(sourceTemplatesDir, { recursive: true });
-      
+
       for (const template of templates) {
         if (typeof template === 'string' && template.endsWith('.md')) {
           const sourcePath = path.join(sourceTemplatesDir, template);
           const destPath = path.join(templatesDir, template);
-          
+
           // Ensure destination directory exists
           await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
-          
+
           const content = await fs.promises.readFile(sourcePath, 'utf8');
           await fs.promises.writeFile(destPath, content, 'utf8');
         }
@@ -351,15 +372,15 @@ export class SpecKitManager {
 
   private async copySpecKitScripts(scriptsDir: string): Promise<void> {
     const sourceScriptsDir = path.join(__dirname, '../../temp_spec_kit/scripts/powershell');
-    
+
     try {
       const scripts = await fs.promises.readdir(sourceScriptsDir);
-      
+
       for (const script of scripts) {
         if (script.endsWith('.ps1')) {
           const sourcePath = path.join(sourceScriptsDir, script);
           const destPath = path.join(scriptsDir, script);
-          
+
           const content = await fs.promises.readFile(sourcePath, 'utf8');
           await fs.promises.writeFile(destPath, content, 'utf8');
         }
@@ -467,7 +488,7 @@ All code reviews verify constitutional compliance.
 
   private formatResearchResults(researchTasks: any[]): string {
     let content = '# Research Results\n\n';
-    
+
     researchTasks.forEach(task => {
       content += `## ${task.id}: ${task.description}\n\n`;
       content += `**Rationale**: ${task.rationale}\n\n`;
@@ -477,32 +498,34 @@ All code reviews verify constitutional compliance.
       }
       content += '---\n\n';
     });
-    
+
     return content;
   }
 
   private async showSpecificationResults(workflow: SpecKitWorkflow): Promise<void> {
     const spec = workflow.spec!;
-    
+
     let message = `✅ Specification created: ${spec.title}\n\n`;
-    
+
     if (spec.clarificationNeeded.length > 0) {
       message += `⚠️  Clarifications needed:\n${spec.clarificationNeeded.map(c => `• ${c}`).join('\n')}\n\n`;
     }
-    
+
     if (!spec.constitutionCompliance.passed) {
       message += `🚨 Constitution violations:\n${spec.constitutionCompliance.violations.map(v => `• ${v}`).join('\n')}\n\n`;
     }
-    
+
     message += `📋 ${spec.functionalRequirements.length} functional requirements\n`;
     message += `👥 ${spec.userScenarios.length} user scenarios\n`;
     message += `🏗️  ${spec.keyEntities.length} key entities identified`;
-    
+
     const action = await vscode.window.showInformationMessage(
       message,
-      'Create Plan', 'Refine Spec', 'View Spec'
+      'Create Plan',
+      'Refine Spec',
+      'View Spec'
     );
-    
+
     switch (action) {
       case 'Create Plan':
         await this.createImplementationPlan(workflow.id);
@@ -510,10 +533,13 @@ All code reviews verify constitutional compliance.
       case 'Refine Spec':
         const refinements = await vscode.window.showInputBox({
           prompt: 'Enter refinements (comma-separated)',
-          placeHolder: 'Add more details about user roles, clarify requirements...'
+          placeHolder: 'Add more details about user roles, clarify requirements...',
         });
         if (refinements) {
-          await this.refineSpecification(workflow.id, refinements.split(',').map(r => r.trim()));
+          await this.refineSpecification(
+            workflow.id,
+            refinements.split(',').map(r => r.trim())
+          );
         }
         break;
       case 'View Spec':
@@ -525,21 +551,23 @@ All code reviews verify constitutional compliance.
 
   private async showPlanResults(workflow: SpecKitWorkflow): Promise<void> {
     const plan = workflow.plan!;
-    
+
     let message = `✅ Implementation plan created: ${workflow.featureName}\n\n`;
     message += `🏗️  Project type: ${plan.projectStructure.type}\n`;
     message += `💻 Tech stack: ${plan.technicalContext.language}, ${plan.technicalContext.primaryDependencies.join(', ')}\n`;
     message += `🔍 ${plan.researchTasks.length} research tasks completed\n`;
-    
+
     if (plan.constitutionCheck.violations.length > 0) {
       message += `\n🚨 Constitution violations:\n${plan.constitutionCheck.violations.map(v => `• ${v}`).join('\n')}`;
     }
-    
+
     const action = await vscode.window.showInformationMessage(
       message,
-      'Generate Tasks', 'View Plan', 'Review Research'
+      'Generate Tasks',
+      'View Plan',
+      'Review Research'
     );
-    
+
     switch (action) {
       case 'Generate Tasks':
         await this.generateTasks(workflow.id);
@@ -557,27 +585,31 @@ All code reviews verify constitutional compliance.
 
   private async showTaskResults(workflow: SpecKitWorkflow): Promise<void> {
     const tasks = workflow.tasks!;
-    
+
     let message = `✅ Task list generated: ${workflow.featureName}\n\n`;
     message += `📋 ${tasks.tasks.length} tasks created\n`;
     message += `⏱️  Estimated duration: ${tasks.estimatedDuration}\n`;
     message += `🔄 ${tasks.parallelGroups.length} parallel execution groups\n`;
-    
+
     const testTasks = tasks.tasks.filter(t => t.type === 'test').length;
     const implTasks = tasks.tasks.filter(t => t.type === 'implementation').length;
-    
+
     message += `\n🧪 ${testTasks} test tasks (TDD enforced)\n`;
     message += `⚙️ ${implTasks} implementation tasks`;
-    
+
     const action = await vscode.window.showInformationMessage(
       message,
-      'Start Implementation', 'View Tasks', 'Export Tasks'
+      'Start Implementation',
+      'View Tasks',
+      'Export Tasks'
     );
-    
+
     switch (action) {
       case 'Start Implementation':
         // This would integrate with the existing workflow manager
-        vscode.window.showInformationMessage('🚀 Ready for implementation! Tasks are available in the workflow manager.');
+        vscode.window.showInformationMessage(
+          '🚀 Ready for implementation! Tasks are available in the workflow manager.'
+        );
         break;
       case 'View Tasks':
         const tasksUri = vscode.Uri.file(path.join(workflow.specsDir, 'tasks.md'));

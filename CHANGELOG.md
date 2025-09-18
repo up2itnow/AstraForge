@@ -3,13 +3,15 @@
 All notable changes to AstraForge IDE will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.0.0] - 2025-01-13
 
 ### 🎉 Major Release: True Multi-LLM Collaboration
 
 #### Added
+
 - **Revolutionary Multi-LLM Collaboration System**
   - Time-bounded collaborative sessions (3-5 minutes)
   - Structured rounds: Propose → Critique → Synthesize → Validate
@@ -41,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Research automation for technology selection
 
 #### Changed
+
 - **README.md**: Complete overhaul with consolidated information
 - **LLMManager**: Removed sequential handoffs, now true collaboration
 - **WorkflowManager**: Spec-driven phases with Git integration
@@ -48,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Environment Loading**: Enhanced EnvLoader with validation and debugging
 
 #### Fixed
+
 - OpenRouter API authentication (was using placeholder keys)
 - CollaborativeSessionManager missing methods
 - Time limit validation in collaboration tests
@@ -55,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multiple environment variable conflicts
 
 #### Security
+
 - API keys stored securely in .env (never committed)
 - Budget controls and spending limits
 - Timeout protection for API calls
@@ -65,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Initial Release
 
 #### Added
+
 - Basic multi-LLM support (sequential)
 - Vector database with embeddings
 - Git integration
@@ -77,17 +83,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Future Releases
 
 ### [2.1.0] - Planned
+
 - Advanced synthesis algorithms
 - Conflict resolution mechanisms
 - Machine learning-based LLM assignment
 - Performance analytics dashboard
 
 ### [3.0.0] - Roadmap
+
 - Cloud collaboration features
 - Team synchronization
 - Enterprise security features
-- VS Code Marketplace release
-=======
+- # VS Code Marketplace release
+
 # AstraForge IDE Changelog
 
 All notable changes to the AstraForge IDE extension will be documented in this
@@ -240,4 +248,5 @@ contribute:
 _This changelog is maintained automatically by
 [semantic-release](https://github.com/semantic-release/semantic-release) and
 [conventional commits](https://conventionalcommits.org/)._
->>>>>>> f5a255fd08362c17ce5f3d93e13a141f12cd3118
+
+> > > > > > > f5a255fd08362c17ce5f3d93e13a141f12cd3118

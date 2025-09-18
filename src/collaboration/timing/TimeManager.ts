@@ -1,12 +1,16 @@
 /**
  * TimeManager - Handles time limits, timeouts, and warnings for collaborative sessions
- * 
+ *
  * This class provides robust timing functionality with countdown warnings,
  * graceful timeout handling, and configurable time limits for different
  * collaboration scenarios.
  */
 
-import { TimeManager as ITimeManager, TimerCallbacks, CollaborationError as _CollaborationError } from '../types/collaborationTypes';
+import {
+  TimeManager as ITimeManager,
+  TimerCallbacks,
+  CollaborationError as _CollaborationError,
+} from '../types/collaborationTypes';
 import { logger } from '../../utils/logger';
 
 interface ActiveTimer {
@@ -25,7 +29,7 @@ export class TimeManager implements ITimeManager {
   private timerIdCounter = 0;
 
   // Warning thresholds as percentages of total time
-  private readonly WARNING_THRESHOLDS = [0.75, 0.90]; // 75% and 90%
+  private readonly WARNING_THRESHOLDS = [0.75, 0.9]; // 75% and 90%
 
   /**
    * Start a new timer with specified duration and callbacks
@@ -41,7 +45,7 @@ export class TimeManager implements ITimeManager {
       callbacks,
       warningsSent: new Array(this.WARNING_THRESHOLDS.length).fill(false),
       isActive: true,
-      warningHandles: []
+      warningHandles: [],
     };
 
     // Set up warning timers
@@ -159,16 +163,19 @@ export class TimeManager implements ITimeManager {
   /**
    * Get statistics for all active timers
    */
-  getActiveTimerStats(): { count: number; timers: { id: string; remaining: number; progress: number }[] } {
+  getActiveTimerStats(): {
+    count: number;
+    timers: { id: string; remaining: number; progress: number }[];
+  } {
     const activeTimers = Array.from(this.timers.values()).filter(t => t.isActive);
-    
+
     return {
       count: activeTimers.length,
       timers: activeTimers.map(timer => ({
         id: timer.id,
         remaining: this.getRemainingTime(timer.id),
-        progress: this.getProgress(timer.id)
-      }))
+        progress: this.getProgress(timer.id),
+      })),
     };
   }
 
@@ -197,14 +204,16 @@ export class TimeManager implements ITimeManager {
 
     this.WARNING_THRESHOLDS.forEach((threshold, index) => {
       const warningTime = timer.duration * threshold;
-      
+
       const warningHandle = setTimeout(() => {
         if (timer.isActive && !timer.warningsSent[index]) {
           timer.warningsSent[index] = true;
           const remainingTime = this.getRemainingTime(timer.id);
-          
-          logger.warn(`⚠️ Timer ${timer.id} warning: ${remainingTime}ms remaining (${Math.round((1-threshold) * 100)}% left)`);
-          
+
+          logger.warn(
+            `⚠️ Timer ${timer.id} warning: ${remainingTime}ms remaining (${Math.round((1 - threshold) * 100)}% left)`
+          );
+
           try {
             timer.callbacks!.onWarning!(remainingTime);
           } catch (error) {
@@ -254,10 +263,12 @@ export class TimeManager implements ITimeManager {
     onTimeout?: () => void
   ): string {
     const callbacks: TimerCallbacks = {};
-    
+
     if (onWarning) {
-      callbacks.onWarning = (remaining) => {
-        logger.warn(`⚠️ Round ${roundType} time warning: ${Math.round(remaining/1000)}s remaining`);
+      callbacks.onWarning = remaining => {
+        logger.warn(
+          `⚠️ Round ${roundType} time warning: ${Math.round(remaining / 1000)}s remaining`
+        );
         onWarning(remaining);
       };
     }
@@ -282,10 +293,12 @@ export class TimeManager implements ITimeManager {
     onTimeout?: () => void
   ): string {
     const callbacks: TimerCallbacks = {};
-    
+
     if (onWarning) {
-      callbacks.onWarning = (remaining) => {
-        logger.warn(`⚠️ Session ${sessionId} time warning: ${Math.round(remaining/1000)}s remaining`);
+      callbacks.onWarning = remaining => {
+        logger.warn(
+          `⚠️ Session ${sessionId} time warning: ${Math.round(remaining / 1000)}s remaining`
+        );
         onWarning(remaining);
       };
     }
@@ -305,11 +318,11 @@ export class TimeManager implements ITimeManager {
    */
   dispose(): void {
     logger.debug('⏰ TimeManager disposing all timers...');
-    
+
     for (const [timerId] of this.timers) {
       this.stopTimer(timerId);
     }
-    
+
     this.timers.clear();
     this.timerIdCounter = 0;
   }

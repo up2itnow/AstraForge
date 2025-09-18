@@ -1,14 +1,24 @@
 /**
  * Core type definitions for the True Multi-LLM Collaboration System
- * 
+ *
  * This file defines all interfaces, types, and enums used throughout
  * the collaboration system to ensure type safety and consistency.
  */
 
 export type LLMProvider = 'OpenAI' | 'Anthropic' | 'xAI' | 'OpenRouter';
-export type SessionStatus = 'initializing' | 'active' | 'consensus_reached' | 'timeout' | 'completed' | 'failed';
+export type SessionStatus =
+  | 'initializing'
+  | 'active'
+  | 'consensus_reached'
+  | 'timeout'
+  | 'completed'
+  | 'failed';
 export type RoundType = 'propose' | 'critique' | 'synthesize' | 'validate';
-export type ConsensusLevel = 'unanimous' | 'qualified_majority' | 'simple_majority' | 'forced_consensus';
+export type ConsensusLevel =
+  | 'unanimous'
+  | 'qualified_majority'
+  | 'simple_majority'
+  | 'forced_consensus';
 
 /**
  * Core collaboration session interface
@@ -228,8 +238,14 @@ export interface CollaborationConfig {
  * Events emitted by the collaboration system
  */
 export interface CollaborationEvent {
-  type: 'session_started' | 'round_started' | 'contribution_received' | 
-        'consensus_reached' | 'timeout_warning' | 'session_completed' | 'error';
+  type:
+    | 'session_started'
+    | 'round_started'
+    | 'contribution_received'
+    | 'consensus_reached'
+    | 'timeout_warning'
+    | 'session_completed'
+    | 'error';
   sessionId: string;
   timestamp: Date;
   data: any;

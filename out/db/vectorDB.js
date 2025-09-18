@@ -152,5 +152,18 @@ export class VectorDB {
         }
         return embeddings;
     }
+    /**
+     * Add a document with text content to the vector database
+     * Legacy method for backward compatibility
+     */
+    async addDocument(id, content, metadata = {}) {
+        try {
+            const embedding = await this.getEmbedding(content);
+            await this.addEmbedding(id, embedding, { ...metadata, content });
+        }
+        catch (error) {
+            throw new Error(`Failed to add document ${id}: ${error.message}`);
+        }
+    }
 }
 //# sourceMappingURL=vectorDB.js.map
