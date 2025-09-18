@@ -138,7 +138,7 @@ describe('WorkflowManager', () => {
     beforeEach(() => {
       mockVector.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
       mockVector.queryEmbedding.mockResolvedValue([
-        { id: 'test1', similarity: 0.9, metadata: { plan: 'Previous plan data' } },
+        { id: 'test1', vector: [1, 2, 3, 4], similarity: 0.9, metadata: { plan: 'Previous plan data' } },
       ]);
       mockLLM.conference.mockResolvedValue('Phase execution result');
       mockLLM.queryLLM.mockResolvedValue('Review result');

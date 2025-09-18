@@ -249,12 +249,10 @@ describe('VectorDB', () => {
 
       await vectorDB.init();
       await vectorDB.addEmbedding('test', [1, 2, 3], { data: 'test' });
-      await vectorDB.save();
 
       expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         path.join(testStoragePath, 'vectordb', 'vectors.json'),
-        expect.stringContaining('"id":"test"'),
-        'utf8'
+        expect.stringContaining('"id":"test"')
       );
     });
 

@@ -152,5 +152,23 @@ export class VectorDB {
         }
         return embeddings;
     }
+    /**
+     * Add a document with automatic embedding generation
+     * Compatibility method to support existing API usage
+     */
+    async addDocument(id, content, metadata = {}) {
+        try {
+            const embedding = await this.getEmbedding(content);
+            await this.addEmbedding(id, embedding, {
+                content,
+                ...metadata,
+                timestamp: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            console.error(`Failed to add document ${id}:`, error);
+            throw error;
+        }
+    }
 }
 //# sourceMappingURL=vectorDB.js.map

@@ -298,4 +298,25 @@ Respond with ONLY the option you choose, exactly as written.`;
   clearCache(): void {
     this.cache.clear();
   }
+
+  /**
+   * Generate response from a specific provider
+   * Compatibility method to support existing API usage
+   */
+  async generateResponse(providerName: string, prompt: string): Promise<string> {
+    // Find the first config that matches the provider
+    const configIndex = this.panel.findIndex(config => 
+      config.provider.toLowerCase() === providerName.toLowerCase()
+    );
+    
+    if (configIndex === -1) {
+      // Fallback to the first available LLM if provider not found
+      if (this.panel.length > 0) {
+        return this.queryLLM(0, prompt);
+      }
+      throw new Error(`No LLM configuration found for provider: ${providerName}`);
+    }
+    
+    return this.queryLLM(configIndex, prompt);
+  }
 }
