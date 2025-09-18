@@ -19,7 +19,7 @@ describe('AdaptiveWorkflowRL', () => {
   describe('Initialization', () => {
     it('should initialize with default parameters', () => {
       expect(rl).toBeInstanceOf(AdaptiveWorkflowRL);
-      
+
       const stats = rl.getStats();
       expect(stats.totalStates).toBe(0);
       expect(stats.totalActions).toBe(0);
@@ -30,16 +30,14 @@ describe('AdaptiveWorkflowRL', () => {
       const mockQTableData = [
         {
           state: '{"phase":"Planning","complexity":0.5}',
-          actions: [
-            { action: '{"type":"continue"}', qValue: 0.8, visits: 5 }
-          ]
-        }
+          actions: [{ action: '{"type":"continue"}', qValue: 0.8, visits: 5 }],
+        },
       ];
       mockGlobal.astraforge_qtable = mockQTableData;
 
       const rlWithData = new AdaptiveWorkflowRL();
       const stats = rlWithData.getStats();
-      
+
       expect(stats.totalStates).toBe(1);
       expect(stats.totalActions).toBe(1);
     });
@@ -52,7 +50,7 @@ describe('AdaptiveWorkflowRL', () => {
         projectComplexity: 0.75,
         userSatisfaction: 0.8,
         errorRate: 0.1,
-        timeSpent: 0.5
+        timeSpent: 0.5,
       };
 
       const serialized = (rl as any).serializeState(state);
@@ -66,8 +64,20 @@ describe('AdaptiveWorkflowRL', () => {
     });
 
     it('should round values consistently for state bucketing', () => {
-      const state1 = { currentPhase: 'Testing', projectComplexity: 0.74, userSatisfaction: 0.76, errorRate: 0.04, timeSpent: 0.23 };
-      const state2 = { currentPhase: 'Testing', projectComplexity: 0.76, userSatisfaction: 0.74, errorRate: 0.06, timeSpent: 0.27 };
+      const state1 = {
+        currentPhase: 'Testing',
+        projectComplexity: 0.74,
+        userSatisfaction: 0.76,
+        errorRate: 0.04,
+        timeSpent: 0.23,
+      };
+      const state2 = {
+        currentPhase: 'Testing',
+        projectComplexity: 0.76,
+        userSatisfaction: 0.74,
+        errorRate: 0.06,
+        timeSpent: 0.27,
+      };
 
       const serialized1 = (rl as any).serializeState(state1);
       const serialized2 = (rl as any).serializeState(state2);
@@ -80,7 +90,7 @@ describe('AdaptiveWorkflowRL', () => {
   describe('Action Management', () => {
     it('should serialize and deserialize actions correctly', () => {
       const action = { type: 'continue', target: 'Testing', confidence: 0.9 };
-      
+
       const serialized = (rl as any).serializeAction(action);
       const deserialized = (rl as any).deserializeAction(serialized);
 
@@ -91,7 +101,7 @@ describe('AdaptiveWorkflowRL', () => {
 
     it('should handle actions without targets', () => {
       const action = { type: 'skip', confidence: 0.7 };
-      
+
       const serialized = (rl as any).serializeAction(action);
       const deserialized = (rl as any).deserializeAction(serialized);
 
@@ -106,12 +116,12 @@ describe('AdaptiveWorkflowRL', () => {
       projectComplexity: 0.5,
       userSatisfaction: 0.7,
       errorRate: 0.2,
-      timeSpent: 0.3
+      timeSpent: 0.3,
     };
 
     it('should return random action for unexplored states', () => {
       const action = rl.getBestAction(mockState);
-      
+
       expect(action).toBeDefined();
       expect(action.type).toBeOneOf(['continue', 'skip', 'repeat', 'branch', 'optimize']);
     });
@@ -133,12 +143,12 @@ describe('AdaptiveWorkflowRL', () => {
 
       // Add Q-values
       rl.updateQValue(mockState, { type: 'continue', confidence: 1.0 }, 1.0, mockState);
-      
+
       const actions = [];
       for (let i = 0; i < 10; i++) {
         actions.push(rl.getBestAction(mockState).type);
       }
-      
+
       // Should have some variety due to exploration
       const uniqueActions = new Set(actions);
       expect(uniqueActions.size).toBeGreaterThan(1);
@@ -151,7 +161,7 @@ describe('AdaptiveWorkflowRL', () => {
       projectComplexity: 0.5,
       userSatisfaction: 0.7,
       errorRate: 0.2,
-      timeSpent: 0.3
+      timeSpent: 0.3,
     };
 
     const state2 = {
@@ -159,7 +169,7 @@ describe('AdaptiveWorkflowRL', () => {
       projectComplexity: 0.5,
       userSatisfaction: 0.8,
       errorRate: 0.1,
-      timeSpent: 0.4
+      timeSpent: 0.4,
     };
 
     const action = { type: 'continue', confidence: 1.0 };
@@ -177,7 +187,7 @@ describe('AdaptiveWorkflowRL', () => {
 
     it('should increase Q-value for positive rewards', () => {
       rl.updateQValue(state1, action, 1.0, state2);
-      
+
       // Get the Q-value (through another update to see the change)
       const beforeSecondUpdate = rl.getStats();
       rl.updateQValue(state1, action, 1.0, state2);
@@ -198,12 +208,12 @@ describe('AdaptiveWorkflowRL', () => {
 
     it('should decay exploration rate over time', () => {
       const initialExploration = rl.getStats().explorationRate;
-      
+
       // Perform multiple updates
       for (let i = 0; i < 10; i++) {
         rl.updateQValue(state1, action, 0.5, state2);
       }
-      
+
       const finalExploration = rl.getStats().explorationRate;
       expect(finalExploration).toBeLessThan(initialExploration);
       expect(finalExploration).toBeGreaterThanOrEqual(0.01); // Min exploration rate
@@ -216,7 +226,7 @@ describe('AdaptiveWorkflowRL', () => {
       projectComplexity: 0.5,
       userSatisfaction: 0.6,
       errorRate: 0.3,
-      timeSpent: 0.5
+      timeSpent: 0.5,
     };
 
     const newState = {
@@ -224,34 +234,64 @@ describe('AdaptiveWorkflowRL', () => {
       projectComplexity: 0.5,
       userSatisfaction: 0.8,
       errorRate: 0.1,
-      timeSpent: 0.6
+      timeSpent: 0.6,
     };
 
     it('should reward phase success', () => {
-      const reward = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, newState, true);
+      const reward = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        newState,
+        true
+      );
       expect(reward).toBeGreaterThan(0);
     });
 
     it('should penalize phase failure', () => {
-      const reward = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, newState, false);
+      const reward = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        newState,
+        false
+      );
       expect(reward).toBeLessThan(0);
     });
 
     it('should reward satisfaction improvement', () => {
-      const rewardWithImprovement = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, newState, true);
-      
+      const rewardWithImprovement = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        newState,
+        true
+      );
+
       const newStateWorseStatisfaction = { ...newState, userSatisfaction: 0.4 };
-      const rewardWithDegradation = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, newStateWorseStatisfaction, true);
-      
+      const rewardWithDegradation = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        newStateWorseStatisfaction,
+        true
+      );
+
       expect(rewardWithImprovement).toBeGreaterThan(rewardWithDegradation);
     });
 
     it('should penalize error rate increase', () => {
       const newStateMoreErrors = { ...newState, errorRate: 0.5 };
-      const reward = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, newStateMoreErrors, true);
-      
+      const reward = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        newStateMoreErrors,
+        true
+      );
+
       // Should be less than base success reward due to error penalty
-      const baseReward = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, newState, true);
+      const baseReward = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        newState,
+        true
+      );
       expect(reward).toBeLessThan(baseReward);
     });
 
@@ -259,22 +299,50 @@ describe('AdaptiveWorkflowRL', () => {
       const simpleProject = { ...oldState, projectComplexity: 0.2 };
       const complexProject = { ...oldState, projectComplexity: 0.9 };
 
-      const skipSimple = rl.calculateReward(simpleProject, { type: 'skip', confidence: 0.8 }, newState, true);
-      const skipComplex = rl.calculateReward(complexProject, { type: 'skip', confidence: 0.8 }, newState, true);
+      const skipSimple = rl.calculateReward(
+        simpleProject,
+        { type: 'skip', confidence: 0.8 },
+        newState,
+        true
+      );
+      const skipComplex = rl.calculateReward(
+        complexProject,
+        { type: 'skip', confidence: 0.8 },
+        newState,
+        true
+      );
 
       expect(skipSimple).toBeGreaterThan(skipComplex); // Skipping simple projects should be rewarded more
     });
 
     it('should incorporate user feedback', () => {
-      const rewardWithGoodFeedback = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, newState, true, 0.9);
-      const rewardWithBadFeedback = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, newState, true, 0.1);
+      const rewardWithGoodFeedback = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        newState,
+        true,
+        0.9
+      );
+      const rewardWithBadFeedback = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        newState,
+        true,
+        0.1
+      );
 
       expect(rewardWithGoodFeedback).toBeGreaterThan(rewardWithBadFeedback);
     });
 
     it('should clamp rewards to valid range', () => {
       const extremeState = { ...newState, userSatisfaction: 1.0, errorRate: 0.0 };
-      const reward = rl.calculateReward(oldState, { type: 'continue', confidence: 1.0 }, extremeState, true, 1.0);
+      const reward = rl.calculateReward(
+        oldState,
+        { type: 'continue', confidence: 1.0 },
+        extremeState,
+        true,
+        1.0
+      );
 
       expect(reward).toBeLessThanOrEqual(2.0);
       expect(reward).toBeGreaterThanOrEqual(-2.0);
@@ -283,7 +351,13 @@ describe('AdaptiveWorkflowRL', () => {
 
   describe('Persistence', () => {
     it('should save Q-table to global storage', () => {
-      const state = { currentPhase: 'Testing', projectComplexity: 0.5, userSatisfaction: 0.7, errorRate: 0.2, timeSpent: 0.3 };
+      const state = {
+        currentPhase: 'Testing',
+        projectComplexity: 0.5,
+        userSatisfaction: 0.7,
+        errorRate: 0.2,
+        timeSpent: 0.3,
+      };
       const action = { type: 'continue', confidence: 1.0 };
 
       rl.updateQValue(state, action, 1.0, state);
@@ -298,10 +372,8 @@ describe('AdaptiveWorkflowRL', () => {
       const mockData = [
         {
           state: '{"phase":"Planning","complexity":0.5}',
-          actions: [
-            { action: '{"type":"continue"}', qValue: 1.5, visits: 3 }
-          ]
-        }
+          actions: [{ action: '{"type":"continue"}', qValue: 1.5, visits: 3 }],
+        },
       ];
       mockGlobal.astraforge_qtable = mockData;
 
@@ -325,7 +397,13 @@ describe('AdaptiveWorkflowRL', () => {
 
   describe('Statistics', () => {
     it('should track learning progress accurately', () => {
-      const state = { currentPhase: 'Planning', projectComplexity: 0.5, userSatisfaction: 0.7, errorRate: 0.2, timeSpent: 0.3 };
+      const state = {
+        currentPhase: 'Planning',
+        projectComplexity: 0.5,
+        userSatisfaction: 0.7,
+        errorRate: 0.2,
+        timeSpent: 0.3,
+      };
       const action1 = { type: 'continue', confidence: 1.0 };
       const action2 = { type: 'skip', confidence: 0.8 };
 
@@ -339,8 +417,20 @@ describe('AdaptiveWorkflowRL', () => {
     });
 
     it('should count unique states correctly', () => {
-      const state1 = { currentPhase: 'Planning', projectComplexity: 0.5, userSatisfaction: 0.7, errorRate: 0.2, timeSpent: 0.3 };
-      const state2 = { currentPhase: 'Testing', projectComplexity: 0.5, userSatisfaction: 0.7, errorRate: 0.2, timeSpent: 0.3 };
+      const state1 = {
+        currentPhase: 'Planning',
+        projectComplexity: 0.5,
+        userSatisfaction: 0.7,
+        errorRate: 0.2,
+        timeSpent: 0.3,
+      };
+      const state2 = {
+        currentPhase: 'Testing',
+        projectComplexity: 0.5,
+        userSatisfaction: 0.7,
+        errorRate: 0.2,
+        timeSpent: 0.3,
+      };
       const action = { type: 'continue', confidence: 1.0 };
 
       rl.updateQValue(state1, action, 1.0, state1);
@@ -357,9 +447,10 @@ expect.extend({
   toBeOneOf(received, expected) {
     const pass = expected.includes(received);
     return {
-      message: () => pass 
-        ? `expected ${received} not to be one of ${expected}`
-        : `expected ${received} to be one of ${expected}`,
+      message: () =>
+        pass
+          ? `expected ${received} not to be one of ${expected}`
+          : `expected ${received} to be one of ${expected}`,
       pass,
     };
   },

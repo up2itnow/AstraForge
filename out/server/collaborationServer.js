@@ -14,9 +14,9 @@ export class CollaborationServer {
         this.server = createServer();
         this.io = new Server(this.server, {
             cors: {
-                origin: "*",
-                methods: ["GET", "POST"]
-            }
+                origin: '*',
+                methods: ['GET', 'POST'],
+            },
         });
         this.setupEventHandlers();
     }
@@ -34,7 +34,7 @@ export class CollaborationServer {
         });
     }
     async stop() {
-        return new Promise((resolve) => {
+        return new Promise(resolve => {
             this.server.close(() => {
                 console.log('Collaboration server stopped');
                 resolve();
@@ -42,7 +42,7 @@ export class CollaborationServer {
         });
     }
     setupEventHandlers() {
-        this.io.on('connection', (socket) => {
+        this.io.on('connection', socket => {
             console.log(`New connection: ${socket.id}`);
             // Agent registration
             socket.on('register_agent', (agentData) => {
@@ -77,7 +77,7 @@ export class CollaborationServer {
             name: agentData.name || `Agent-${socket.id.substring(0, 8)}`,
             capabilities: agentData.capabilities || [],
             status: 'active',
-            workspaceId: agentData.workspaceId || 'default'
+            workspaceId: agentData.workspaceId || 'default',
         };
         this.agents.set(socket.id, agent);
         socket.join(agent.workspaceId);
@@ -89,11 +89,11 @@ export class CollaborationServer {
         // Notify other agents in workspace
         socket.to(agent.workspaceId).emit('agent_joined', {
             agent: agent,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
         socket.emit('registration_complete', {
             agent: agent,
-            workspace_agents: this.getWorkspaceAgents(agent.workspaceId)
+            workspace_agents: this.getWorkspaceAgents(agent.workspaceId),
         });
         console.log(`Agent registered: ${agent.name} (${agent.type}) in workspace ${agent.workspaceId}`);
     }
@@ -117,7 +117,7 @@ export class CollaborationServer {
         // Notify workspace
         socket.to(workspaceId).emit('agent_joined', {
             agent: agent,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
     }
     handleMessage(socket, message) {
@@ -178,7 +178,7 @@ export class CollaborationServer {
             file: change.file,
             diff: change.diff,
             author: sender.name,
-            timestamp: message.timestamp
+            timestamp: message.timestamp,
         });
     }
     handleStatusUpdate(message, sender) {
@@ -189,7 +189,7 @@ export class CollaborationServer {
             this.io.to(agent.workspaceId).emit('agent_status_update', {
                 agentId: sender.id,
                 status: agent.status,
-                timestamp: message.timestamp
+                timestamp: message.timestamp,
             });
         }
     }
@@ -208,7 +208,7 @@ export class CollaborationServer {
                 isolationId,
                 originalWorkspace,
                 taskData,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
             // Set timeout to return agent to original workspace
             setTimeout(() => {
@@ -218,7 +218,7 @@ export class CollaborationServer {
                 socket.emit('isolation_ended', {
                     isolationId,
                     returnedTo: originalWorkspace,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 });
             }, taskData.timeout || 30000); // Default 30 seconds
         }
@@ -231,7 +231,7 @@ export class CollaborationServer {
             socket.to(agent.workspaceId).emit('agent_status_update', {
                 agentId: socket.id,
                 status: status,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         }
     }
@@ -244,7 +244,7 @@ export class CollaborationServer {
             socket.to(agent.workspaceId).emit('agent_left', {
                 agentId: socket.id,
                 agentName: agent.name,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
             // Cleanup
             this.agents.delete(socket.id);
@@ -273,7 +273,7 @@ export class CollaborationServer {
             agentCount: agents.length,
             messageCount: messages.length,
             activeAgents: agents.filter(a => a.status === 'active').length,
-            lastActivity: messages.length > 0 ? messages[messages.length - 1].timestamp : null
+            lastActivity: messages.length > 0 ? messages[messages.length - 1].timestamp : null,
         };
     }
     getAllWorkspaces() {

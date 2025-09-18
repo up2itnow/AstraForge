@@ -41,7 +41,7 @@ export class VectorDB {
         // Simple cosine similarity implementation
         const similarities = this.items.map(item => ({
             item,
-            similarity: this.cosineSimilarity(vector, item.vector)
+            similarity: this.cosineSimilarity(vector, item.vector),
         }));
         similarities.sort((a, b) => b.similarity - a.similarity);
         return similarities.slice(0, topK).map(s => ({ ...s.item, similarity: s.similarity }));
@@ -78,7 +78,7 @@ export class VectorDB {
             // Use Hugging Face inference for real embeddings
             const response = await this.hf.featureExtraction({
                 model: this.embeddingModel,
-                inputs: cleanText
+                inputs: cleanText,
             });
             // Handle different response formats
             let embedding;
@@ -121,7 +121,7 @@ export class VectorDB {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
+            hash = (hash << 5) - hash + char;
             hash = hash & hash; // Convert to 32-bit integer
         }
         return Math.abs(hash);
