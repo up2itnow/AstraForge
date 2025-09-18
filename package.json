@@ -10,9 +10,6 @@
   "categories": [
     "Extension Packs"
   ],
-  "activationEvents": [
-    "onView:astraforge.projectIgnition"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "views": {

@@ -158,3 +158,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 *"The future of coding is not about replacing developers, but about amplifying human creativity through AI collaboration."* - AstraForge Vision
+### Line endings
+
+This repository enforces consistent line endings via `.gitattributes`. Most text files use LF; Windows scripts use CRLF.
+
+```gitattributes
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.sh text eol=lf
+```

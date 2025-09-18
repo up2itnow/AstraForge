@@ -1,0 +1,243 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "AstraForge Code Review API",
+    "version": "1.0.0",
+    "description": "AI-powered code analysis and review API"
+  },
+  "paths": {
+    "/analyze-code": {
+      "post": {
+        "summary": "Analyze code for quality and suggestions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["files"],
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Array of file paths to analyze"
+                  },
+                  "gitCommit": {
+                    "type": "string",
+                    "description": "Git commit hash for context"
+                  },
+                  "analysisType": {
+                    "type": "string",
+                    "enum": ["quick", "comprehensive", "security-focused"],
+                    "default": "comprehensive"
+                  },
+                  "aiModels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["openai", "anthropic", "xai"]
+                    },
+                    "description": "Specific AI models to use"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Analysis completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reviewId": {"type": "string"},
+                    "status": {"type": "string", "enum": ["completed"]},
+                    "suggestionCount": {"type": "integer"},
+                    "qualityScore": {"type": "number", "minimum": 0, "maximum": 100},
+                    "duration": {"type": "integer", "description": "Analysis time in ms"},
+                    "suggestions": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Suggestion"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          },
+          "500": {
+            "description": "Analysis failed",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suggestions/{reviewId}": {
+      "get": {
+        "summary": "Retrieve suggestions for a review",
+        "parameters": [
+          {
+            "name": "reviewId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["critical", "warning", "info"]
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string", 
+              "enum": ["bug-risk", "performance", "style", "security", "maintainability"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suggestions retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suggestions": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Suggestion"}
+                    },
+                    "total": {"type": "integer"},
+                    "filtered": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feedback": {
+      "post": {
+        "summary": "Submit user feedback on suggestions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["suggestionId", "feedback"],
+                "properties": {
+                  "suggestionId": {"type": "string"},
+                  "feedback": {
+                    "type": "string",
+                    "enum": ["accepted", "rejected", "modified"]
+                  },
+                  "comment": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Feedback recorded successfully"
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Get quality metrics and trends",
+        "parameters": [
+          {
+            "name": "timeframe", 
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["day", "week", "month", "all"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metrics retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/QualityMetrics"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Suggestion": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "type": {
+            "type": "string",
+            "enum": ["bug-risk", "performance", "style", "security", "maintainability"]
+          },
+          "severity": {
+            "type": "string", 
+            "enum": ["critical", "warning", "info"]
+          },
+          "title": {"type": "string"},
+          "description": {"type": "string"},
+          "filePath": {"type": "string"},
+          "lineStart": {"type": "integer"},
+          "lineEnd": {"type": "integer"},
+          "originalCode": {"type": "string"},
+          "suggestedFix": {"type": "string"},
+          "aiModel": {"type": "string"},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      },
+      "QualityMetrics": {
+        "type": "object",
+        "properties": {
+          "complexityScore": {"type": "number"},
+          "maintainabilityIndex": {"type": "number"},
+          "technicalDebt": {"type": "integer"},
+          "readabilityScore": {"type": "number"},
+          "trends": {
+            "type": "object",
+            "properties": {
+              "improvement": {"type": "string", "enum": ["improving", "stable", "declining"]},
+              "velocity": {"type": "number"}
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {"type": "string"},
+          "message": {"type": "string"},
+          "code": {"type": "integer"}
+        }
+      }
+    }
+  }
+}
