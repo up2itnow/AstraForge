@@ -188,6 +188,9 @@ export class SpecKitManager {
     workflow.status = 'planning';
     workflow.updatedAt = new Date();
     
+    // Validate workflow.specsDir is safe before using as base path
+    this.validateWorkflowSpecsDir(workflow);
+    
     // Save plan documents
     const planPath = createSafePath(workflow.specsDir, 'plan.md');
     const researchPath = createSafePath(workflow.specsDir, 'research.md');
@@ -271,6 +274,9 @@ export class SpecKitManager {
     workflow.status = 'tasks';
     workflow.updatedAt = new Date();
     
+    // Validate workflow.specsDir is safe before using as base path
+    this.validateWorkflowSpecsDir(workflow);
+    
     // Save tasks
     const tasksPath = createSafePath(workflow.specsDir, 'tasks.md');
     if (!tasksPath) {
@@ -308,6 +314,9 @@ export class SpecKitManager {
     workflow.spec = refinedSpec;
     workflow.updatedAt = new Date();
     
+    // Validate workflow.specsDir is safe before using as base path
+    this.validateWorkflowSpecsDir(workflow);
+    
     // Save refined specification
     const specPath = createSafePath(workflow.specsDir, 'spec.md');
     if (!specPath) {
@@ -340,9 +349,25 @@ export class SpecKitManager {
   }
 
   private generateWorkflowId(): string {
-    const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
     const counter = String(this.workflows.size + 1).padStart(3, '0');
     return `${counter}`;
+  }
+
+  /**
+   * Validate that workflow.specsDir is within the expected workspace specs directory
+   * to prevent path traversal attacks when using it as a base path
+   */
+  private validateWorkflowSpecsDir(workflow: SpecKitWorkflow): void {
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+    const expectedSpecsBaseDir = path.join(workspaceDir, 'specs');
+    
+    // Ensure workflow.specsDir is within the expected specs directory
+    const normalizedSpecsDir = path.resolve(workflow.specsDir);
+    const normalizedExpectedBase = path.resolve(expectedSpecsBaseDir);
+    
+    if (!normalizedSpecsDir.startsWith(normalizedExpectedBase + path.sep) && normalizedSpecsDir !== normalizedExpectedBase) {
+      throw new Error('Invalid workflow specs directory - path traversal detected');
+    }
   }
 
   private async createDirectoryStructure(dirs: string[]): Promise<void> {
@@ -565,7 +590,7 @@ All code reviews verify constitutional compliance.
       case 'Create Plan':
         await this.createImplementationPlan(workflow.id);
         break;
-      case 'Refine Spec':
+      case 'Refine Spec': {
         const refinements = await vscode.window.showInputBox({
           prompt: 'Enter refinements (comma-separated)',
           placeHolder: 'Add more details about user roles, clarify requirements...'
@@ -574,10 +599,17 @@ All code reviews verify constitutional compliance.
           await this.refineSpecification(workflow.id, refinements.split(',').map(r => r.trim()));
         }
         break;
-      case 'View Spec':
-        const specUri = vscode.Uri.file(path.join(workflow.specsDir, 'spec.md'));
+      }
+      case 'View Spec': {
+        this.validateWorkflowSpecsDir(workflow);
+        const specPath = createSafePath(workflow.specsDir, 'spec.md');
+        if (!specPath) {
+          throw new Error('Failed to create safe path for spec file');
+        }
+        const specUri = vscode.Uri.file(specPath);
         await vscode.window.showTextDocument(specUri);
         break;
+      }
     }
   }
 
@@ -602,14 +634,26 @@ All code reviews verify constitutional compliance.
       case 'Generate Tasks':
         await this.generateTasks(workflow.id);
         break;
-      case 'View Plan':
-        const planUri = vscode.Uri.file(path.join(workflow.specsDir, 'plan.md'));
+      case 'View Plan': {
+        this.validateWorkflowSpecsDir(workflow);
+        const planPath = createSafePath(workflow.specsDir, 'plan.md');
+        if (!planPath) {
+          throw new Error('Failed to create safe path for plan file');
+        }
+        const planUri = vscode.Uri.file(planPath);
         await vscode.window.showTextDocument(planUri);
         break;
-      case 'Review Research':
-        const researchUri = vscode.Uri.file(path.join(workflow.specsDir, 'research.md'));
+      }
+      case 'Review Research': {
+        this.validateWorkflowSpecsDir(workflow);
+        const researchPath = createSafePath(workflow.specsDir, 'research.md');
+        if (!researchPath) {
+          throw new Error('Failed to create safe path for research file');
+        }
+        const researchUri = vscode.Uri.file(researchPath);
         await vscode.window.showTextDocument(researchUri);
         break;
+      }
     }
   }
 
@@ -637,10 +681,16 @@ All code reviews verify constitutional compliance.
         // This would integrate with the existing workflow manager
         vscode.window.showInformationMessage('🚀 Ready for implementation! Tasks are available in the workflow manager.');
         break;
-      case 'View Tasks':
-        const tasksUri = vscode.Uri.file(path.join(workflow.specsDir, 'tasks.md'));
+      case 'View Tasks': {
+        this.validateWorkflowSpecsDir(workflow);
+        const tasksPath = createSafePath(workflow.specsDir, 'tasks.md');
+        if (!tasksPath) {
+          throw new Error('Failed to create safe path for tasks file');
+        }
+        const tasksUri = vscode.Uri.file(tasksPath);
         await vscode.window.showTextDocument(tasksUri);
         break;
+      }
       case 'Export Tasks':
         // Export to project management tool or clipboard
         await vscode.env.clipboard.writeText(tasks.content);
