@@ -8,6 +8,7 @@ import { SpecGenerator, GeneratedSpec, SpecificationRequest } from './specGenera
 import { PlanGenerator, TechnicalPlan } from './planGenerator';
 import { TaskGenerator, TaskList } from './taskGenerator';
 import { logger } from '../utils/logger';
+import { sanitizeForPath } from '../utils/inputValidation';
 
 export interface SpecKitWorkflow {
   id: string;
@@ -111,7 +112,10 @@ export class SpecKitManager {
     // Create workflow
     const workflowId = this.generateWorkflowId();
     const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-    const specsDir = path.join(workspaceDir, 'specs', `${workflowId}-${spec.title.toLowerCase().replace(/\s+/g, '-')}`);
+    
+    // Sanitize spec title for safe use in file paths
+    const sanitizedTitle = sanitizeForPath(spec.title);
+    const specsDir = path.join(workspaceDir, 'specs', `${workflowId}-${sanitizedTitle}`);
     
     const workflow: SpecKitWorkflow = {
       id: workflowId,
@@ -181,7 +185,9 @@ export class SpecKitManager {
     // Create contracts directory and files
     await this.createDirectoryStructure([contractsDir]);
     for (const contract of plan.designPhase.apiContracts) {
-      const contractPath = path.join(contractsDir, `${contract.toLowerCase().replace(/\s+/g, '-')}.json`);
+      // Sanitize contract name for safe use in file paths
+      const sanitizedContract = sanitizeForPath(contract);
+      const contractPath = path.join(contractsDir, `${sanitizedContract}.json`);
       await fs.promises.writeFile(contractPath, JSON.stringify({ contract }, null, 2), 'utf8');
     }
     
