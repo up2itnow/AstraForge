@@ -65,7 +65,7 @@ export function validateAndSanitizePath(
     errors.push('Absolute paths are not allowed');
   }
 
-  // Check for dangerous file names
+  // Check for dangerous file names in path components
   const dangerousNames = [
     /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i,  // Windows reserved names
     /^\./,                                       // Hidden files starting with dot
@@ -74,9 +74,18 @@ export function validateAndSanitizePath(
 
   const pathParts = sanitized.split(/[/\\]/);
   for (const part of pathParts) {
-    if (part && dangerousNames.some(pattern => pattern.test(part))) {
-      errors.push('Path contains invalid or dangerous filename components');
-      break;
+    if (part) {
+      // Check reserved names by removing extension first
+      const nameWithoutExt = part.split('.')[0];
+      if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(nameWithoutExt)) {
+        errors.push('Path contains invalid or dangerous filename components');
+        break;
+      }
+      // Check other dangerous patterns
+      if (dangerousNames.slice(1).some(pattern => pattern.test(part))) {
+        errors.push('Path contains invalid or dangerous filename components');
+        break;
+      }
     }
   }
 
