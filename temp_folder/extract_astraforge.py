@@ -1,6 +1,62 @@
 import os
 import re
 
+def validate_safe_path(user_path, base_dir):
+    """
+    Validate and sanitize file paths to prevent path traversal attacks.
+    
+    Args:
+        user_path: User-provided path component
+        base_dir: Base directory to restrict operations within
+        
+    Returns:
+        tuple: (is_valid, safe_path) - safe_path is None if invalid
+    """
+    if not user_path or not isinstance(user_path, str):
+        return False, None
+    
+    # Remove null bytes and control characters
+    sanitized = ''.join(c for c in user_path if ord(c) >= 32)
+    
+    # Check for path traversal sequences
+    dangerous_patterns = ['../', '..\\', './', '.\\']
+    if any(pattern in sanitized for pattern in dangerous_patterns):
+        return False, None
+    
+    # Check for absolute paths
+    if os.path.isabs(sanitized):
+        return False, None
+    
+    # Normalize path separators and remove dangerous characters
+    sanitized = sanitized.replace('\\', '/').replace('//', '/')
+    sanitized = re.sub(r'[<>:"|?*\x00-\x1f]', '', sanitized)
+    
+    # Remove leading/trailing slashes
+    sanitized = sanitized.strip('/')
+    
+    # Check for empty result
+    if not sanitized:
+        return False, None
+    
+    # Check for dangerous filenames (Windows reserved names)
+    path_parts = sanitized.split('/')
+    reserved_names = ['CON', 'PRN', 'AUX', 'NUL'] + [f'COM{i}' for i in range(1, 10)] + [f'LPT{i}' for i in range(1, 10)]
+    for part in path_parts:
+        name_without_ext = part.split('.')[0].upper()
+        if name_without_ext in reserved_names:
+            return False, None
+    
+    # Construct full path and check if it's within base directory
+    try:
+        full_path = os.path.normpath(os.path.join(base_dir, sanitized))
+        base_abs = os.path.abspath(base_dir)
+        if not full_path.startswith(base_abs + os.sep) and full_path != base_abs:
+            return False, None
+    except (OSError, ValueError):
+        return False, None
+    
+    return True, sanitized
+
 def extract_files(response_text, output_dir='astraforge-ide'):
     # Create output dir if not exists
     os.makedirs(output_dir, exist_ok=True)
@@ -17,11 +73,16 @@ def extract_files(response_text, output_dir='astraforge-ide'):
         if part.startswith('## File: ') or part.startswith('### '):
             # Save previous file if exists
             if current_file:
-                file_path = os.path.join(output_dir, current_file)
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write('\n'.join(content).strip())
-                log.append(f'Created: {file_path}')
+                # Validate path before using it
+                is_valid, safe_path = validate_safe_path(current_file, output_dir)
+                if not is_valid:
+                    log.append(f'Skipped dangerous path: {current_file}')
+                else:
+                    file_path = os.path.join(output_dir, safe_path)
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write('\n'.join(content).strip())
+                    log.append(f'Created: {file_path}')
             
             # New file
             if part.startswith('## File: '):
@@ -40,14 +101,21 @@ def extract_files(response_text, output_dir='astraforge-ide'):
 
     # Save last file
     if current_file and content:
-        file_path = os.path.join(output_dir, current_file)
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(content).strip())
-        log.append(f'Created: {file_path}')
+        # Validate path before using it
+        is_valid, safe_path = validate_safe_path(current_file, output_dir)
+        if not is_valid:
+            log.append(f'Skipped dangerous path: {current_file}')
+        else:
+            file_path = os.path.join(output_dir, safe_path)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(content).strip())
+            log.append(f'Created: {file_path}')
 
-    # Log output
-    with open(os.path.join(output_dir, 'extraction_log.txt'), 'w') as f:
+    # Log output - use safe path for log file
+    log_filename = 'extraction_log.txt'
+    log_path = os.path.join(output_dir, log_filename)
+    with open(log_path, 'w') as f:
         f.write('\n'.join(log))
     print('Extraction complete. Check extraction_log.txt for details.')
 

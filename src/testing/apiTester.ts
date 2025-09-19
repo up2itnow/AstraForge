@@ -4,9 +4,45 @@ import { Command } from 'commander';
 import { ApiTesterCore, TestResult, BatchTestResult, VectorTestResult } from './apiTesterCore.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { validateAndSanitizePath, createSafePath } from '../utils/inputValidation.js';
 
 const program = new Command();
 const tester = new ApiTesterCore();
+
+/**
+ * Safely write output to a file with path validation
+ */
+function safeWriteOutput(outputPath: string, data: any): boolean {
+  try {
+    const validation = validateAndSanitizePath(outputPath);
+    if (!validation.isValid) {
+      console.error(`Invalid output path: ${validation.errors.join(', ')}`);
+      return false;
+    }
+
+    // Ensure we're writing to current directory or a subdirectory
+    const currentDir = process.cwd();
+    const safePath = createSafePath(currentDir, validation.sanitizedPath!);
+    
+    if (!safePath) {
+      console.error('Failed to create safe output path');
+      return false;
+    }
+
+    // Create directory if needed
+    const dir = path.dirname(safePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(safePath, JSON.stringify(data, null, 2));
+    console.log(`Results saved to ${safePath}`);
+    return true;
+  } catch (error) {
+    console.error(`Error writing output file: ${error}`);
+    return false;
+  }
+}
 
 program.name('astraforge').description('AstraForge API Testing Interface').version('0.0.1');
 
@@ -104,8 +140,9 @@ async function testSingle(options: any) {
   };
 
   if (options.output) {
-    fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
-    console.log(`Results saved to ${options.output}`);
+    if (!safeWriteOutput(options.output, output)) {
+      process.exit(1);
+    }
   } else {
     console.log(JSON.stringify(output, null, 2));
   }
@@ -145,8 +182,9 @@ async function testBatchFromFile(options: any) {
   };
 
   if (options.output) {
-    fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
-    console.log(`Results saved to ${options.output}`);
+    if (!safeWriteOutput(options.output, output)) {
+      process.exit(1);
+    }
   } else {
     console.log(JSON.stringify(output, null, 2));
   }
@@ -175,8 +213,9 @@ async function testWorkflow(options: any) {
   };
 
   if (options.output) {
-    fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
-    console.log(`Results saved to ${options.output}`);
+    if (!safeWriteOutput(options.output, output)) {
+      process.exit(1);
+    }
   } else {
     console.log(JSON.stringify(output, null, 2));
   }
@@ -194,8 +233,9 @@ async function testVector(options: any) {
   };
 
   if (options.output) {
-    fs.writeFileSync(options.output, JSON.stringify(output, null, 2));
-    console.log(`Results saved to ${options.output}`);
+    if (!safeWriteOutput(options.output, output)) {
+      process.exit(1);
+    }
   } else {
     console.log(JSON.stringify(output, null, 2));
   }

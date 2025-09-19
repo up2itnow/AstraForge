@@ -8,6 +8,7 @@ import { SpecGenerator, GeneratedSpec, SpecificationRequest } from './specGenera
 import { PlanGenerator, TechnicalPlan } from './planGenerator';
 import { TaskGenerator, TaskList } from './taskGenerator';
 import { logger } from '../utils/logger';
+import { createSafePath, validateAndSanitizePath, validateFilename } from '../utils/inputValidation';
 
 export interface SpecKitWorkflow {
   id: string;
@@ -111,7 +112,21 @@ export class SpecKitManager {
     // Create workflow
     const workflowId = this.generateWorkflowId();
     const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-    const specsDir = path.join(workspaceDir, 'specs', `${workflowId}-${spec.title.toLowerCase().replace(/\s+/g, '-')}`);
+    
+    // Sanitize the spec title to prevent path traversal
+    const sanitizedTitle = spec.title.toLowerCase().replace(/[^a-z0-9\-_]/g, '-').replace(/-+/g, '-');
+    const specDirName = `${workflowId}-${sanitizedTitle}`;
+    
+    // Validate the directory name
+    const specDirValidation = validateAndSanitizePath(specDirName, workspaceDir);
+    if (!specDirValidation.isValid) {
+      throw new Error(`Invalid specification directory name: ${specDirValidation.errors.join(', ')}`);
+    }
+    
+    const specsDir = createSafePath(path.join(workspaceDir, 'specs'), specDirValidation.sanitizedPath!);
+    if (!specsDir) {
+      throw new Error('Failed to create safe path for specification directory');
+    }
     
     const workflow: SpecKitWorkflow = {
       id: workflowId,
@@ -128,7 +143,12 @@ export class SpecKitManager {
     
     // Create spec directory and save specification
     await this.createDirectoryStructure([specsDir]);
-    const specPath = path.join(specsDir, 'spec.md');
+    
+    const specPath = createSafePath(specsDir, 'spec.md');
+    if (!specPath) {
+      throw new Error('Failed to create safe path for specification file');
+    }
+    
     await fs.promises.writeFile(specPath, spec.content, 'utf8');
     
     // Save to vector DB for context
@@ -169,10 +189,14 @@ export class SpecKitManager {
     workflow.updatedAt = new Date();
     
     // Save plan documents
-    const planPath = path.join(workflow.specsDir, 'plan.md');
-    const researchPath = path.join(workflow.specsDir, 'research.md');
-    const dataModelPath = path.join(workflow.specsDir, 'data-model.md');
-    const contractsDir = path.join(workflow.specsDir, 'contracts');
+    const planPath = createSafePath(workflow.specsDir, 'plan.md');
+    const researchPath = createSafePath(workflow.specsDir, 'research.md');
+    const dataModelPath = createSafePath(workflow.specsDir, 'data-model.md');
+    const contractsDir = createSafePath(workflow.specsDir, 'contracts');
+    
+    if (!planPath || !researchPath || !dataModelPath || !contractsDir) {
+      throw new Error('Failed to create safe paths for plan documents');
+    }
     
     await fs.promises.writeFile(planPath, plan.content, 'utf8');
     await fs.promises.writeFile(researchPath, this.formatResearchResults(plan.researchTasks), 'utf8');
@@ -181,7 +205,23 @@ export class SpecKitManager {
     // Create contracts directory and files
     await this.createDirectoryStructure([contractsDir]);
     for (const contract of plan.designPhase.apiContracts) {
-      const contractPath = path.join(contractsDir, `${contract.toLowerCase().replace(/\s+/g, '-')}.json`);
+      // Sanitize contract name to prevent path traversal
+      const sanitizedContractName = contract.toLowerCase().replace(/[^a-z0-9\-_]/g, '-').replace(/-+/g, '-');
+      const contractFilename = `${sanitizedContractName}.json`;
+      
+      // Validate filename
+      const filenameValidation = validateFilename(contractFilename);
+      if (!filenameValidation.isValid) {
+        logger.warn(`Skipping invalid contract filename: ${contract}`);
+        continue;
+      }
+      
+      const contractPath = createSafePath(contractsDir, contractFilename);
+      if (!contractPath) {
+        logger.warn(`Failed to create safe path for contract: ${contract}`);
+        continue;
+      }
+      
       await fs.promises.writeFile(contractPath, JSON.stringify({ contract }, null, 2), 'utf8');
     }
     
@@ -232,7 +272,11 @@ export class SpecKitManager {
     workflow.updatedAt = new Date();
     
     // Save tasks
-    const tasksPath = path.join(workflow.specsDir, 'tasks.md');
+    const tasksPath = createSafePath(workflow.specsDir, 'tasks.md');
+    if (!tasksPath) {
+      throw new Error('Failed to create safe path for tasks file');
+    }
+    
     await fs.promises.writeFile(tasksPath, taskList.content, 'utf8');
     
     // Save to vector DB
@@ -265,7 +309,11 @@ export class SpecKitManager {
     workflow.updatedAt = new Date();
     
     // Save refined specification
-    const specPath = path.join(workflow.specsDir, 'spec.md');
+    const specPath = createSafePath(workflow.specsDir, 'spec.md');
+    if (!specPath) {
+      throw new Error('Failed to create safe path for refined specification file');
+    }
+    
     await fs.promises.writeFile(specPath, refinedSpec.content, 'utf8');
     
     // Update vector DB
@@ -346,7 +394,12 @@ export class SpecKitManager {
 - [ ] Scope is clearly bounded
 `;
 
-    await fs.promises.writeFile(path.join(templatesDir, 'spec-template.md'), specTemplate, 'utf8');
+    const templatePath = createSafePath(templatesDir, 'spec-template.md');
+    if (!templatePath) {
+      throw new Error('Failed to create safe path for spec template');
+    }
+    
+    await fs.promises.writeFile(templatePath, specTemplate, 'utf8');
   }
 
   private async copySpecKitScripts(scriptsDir: string): Promise<void> {
@@ -462,7 +515,12 @@ All code reviews verify constitutional compliance.
 **Version**: 1.0.0 | **Ratified**: ${new Date().toISOString().split('T')[0]} | **Last Amended**: ${new Date().toISOString().split('T')[0]}
 `;
 
-    await fs.promises.writeFile(path.join(memoryDir, 'constitution.md'), constitution, 'utf8');
+    const constitutionPath = createSafePath(memoryDir, 'constitution.md');
+    if (!constitutionPath) {
+      throw new Error('Failed to create safe path for constitution file');
+    }
+    
+    await fs.promises.writeFile(constitutionPath, constitution, 'utf8');
   }
 
   private formatResearchResults(researchTasks: any[]): string {

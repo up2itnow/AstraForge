@@ -1,11 +1,180 @@
 /**
  * Input Validation and Sanitization Utilities
  * Ensures all user inputs are properly validated before sending to LLMs
+ * Includes path traversal prevention for secure file operations
  */
 
+import * as path from 'path';
+
 /**
- * Validation result interface
+ * Path validation result interface
  */
+export interface PathValidationResult {
+  isValid: boolean;
+  errors: string[];
+  sanitizedPath?: string;
+}
+
+/**
+ * Sanitize and validate file paths to prevent path traversal attacks
+ *
+ * @param inputPath - The path to validate and sanitize
+ * @param basePath - Optional base path to restrict operations within
+ * @returns Path validation result with sanitized path
+ */
+export function validateAndSanitizePath(
+  inputPath: string,
+  basePath?: string
+): PathValidationResult {
+  const errors: string[] = [];
+
+  if (!inputPath || typeof inputPath !== 'string') {
+    return {
+      isValid: false,
+      errors: ['Path must be a non-empty string'],
+    };
+  }
+
+  // Remove null bytes and control characters
+  let sanitized = inputPath.replace(/[\u0000-\u001f\u007f]/g, '');
+
+  // Check for path traversal sequences BEFORE sanitization
+  const traversalPatterns = [
+    /\.\./,           // Standard directory traversal
+    /\.\\/,           // Windows directory traversal
+    /\.\//,           // Current directory references (when used maliciously)
+  ];
+
+  const containsTraversal = traversalPatterns.some(pattern => pattern.test(inputPath));
+  if (containsTraversal) {
+    errors.push('Path contains potentially dangerous traversal sequences');
+  }
+
+  // Remove dangerous path components
+  sanitized = sanitized
+    .replace(/\.\./g, '')        // Remove all .. sequences
+    .replace(/\.\\/g, '')        // Remove .\ sequences  
+    .replace(/\.\//g, '')        // Remove ./ sequences
+    .replace(/\/+/g, '/')        // Normalize multiple slashes
+    .replace(/\\+/g, '\\')       // Normalize multiple backslashes
+    .replace(/^[\/\\]+/, '')     // Remove leading slashes
+    .replace(/[\/\\]+$/, '');    // Remove trailing slashes
+
+  // Validate against absolute paths (should be relative)
+  if (path.isAbsolute(inputPath)) {
+    errors.push('Absolute paths are not allowed');
+  }
+
+  // Check for dangerous file names
+  const dangerousNames = [
+    /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i,  // Windows reserved names
+    /^\./,                                       // Hidden files starting with dot
+    /[<>:"|?*]/,                                // Invalid filename characters
+  ];
+
+  const pathParts = sanitized.split(/[/\\]/);
+  for (const part of pathParts) {
+    if (part && dangerousNames.some(pattern => pattern.test(part))) {
+      errors.push('Path contains invalid or dangerous filename components');
+      break;
+    }
+  }
+
+  // If basePath provided, ensure sanitized path would be within it
+  if (basePath && sanitized && errors.length === 0) {
+    try {
+      const resolvedBase = path.resolve(basePath);
+      const resolvedPath = path.resolve(basePath, sanitized);
+      
+      if (!resolvedPath.startsWith(resolvedBase + path.sep) && resolvedPath !== resolvedBase) {
+        errors.push('Path would escape the allowed base directory');
+      }
+    } catch {
+      errors.push('Invalid path structure');
+    }
+  }
+
+  // Final length check
+  if (sanitized.length > 260) {
+    errors.push('Path exceeds maximum allowed length');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitizedPath: errors.length === 0 ? sanitized : undefined,
+  };
+}
+
+/**
+ * Create a safe path by joining base path with sanitized user input
+ *
+ * @param basePath - The base directory path
+ * @param userPath - User-provided path component
+ * @returns Safe path or null if validation fails
+ */
+export function createSafePath(basePath: string, userPath: string): string | null {
+  const validation = validateAndSanitizePath(userPath, basePath);
+  
+  if (!validation.isValid || !validation.sanitizedPath) {
+    return null;
+  }
+
+  return path.join(basePath, validation.sanitizedPath);
+}
+
+/**
+ * Validate filename to ensure it's safe for file operations
+ *
+ * @param filename - The filename to validate
+ * @returns Validation result
+ */
+export function validateFilename(filename: string): ValidationResult {
+  const errors: string[] = [];
+
+  if (!filename || typeof filename !== 'string') {
+    return {
+      isValid: false,
+      errors: ['Filename must be a non-empty string'],
+    };
+  }
+
+  // Remove path separators - filename should not contain paths
+  const sanitized = filename.replace(/[/\\]/g, '');
+
+  if (sanitized !== filename) {
+    errors.push('Filename cannot contain path separators');
+  }
+
+  // Check length
+  if (sanitized.length > 255) {
+    errors.push('Filename exceeds maximum length of 255 characters');
+  }
+
+  // Check for dangerous characters
+  if (/[<>:"|?*\u0000-\u001f\u007f]/.test(sanitized)) {
+    errors.push('Filename contains invalid characters');
+  }
+
+  // Check for reserved names (name without extension)
+  const nameWithoutExt = path.parse(sanitized).name;
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(nameWithoutExt)) {
+    errors.push('Filename uses a reserved system name');
+  }
+
+  // Check for dangerous extensions
+  const dangerousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.com', '.pif', '.vbs', '.js', '.jar'];
+  const ext = path.extname(sanitized).toLowerCase();
+  if (dangerousExtensions.includes(ext)) {
+    errors.push('File extension is not allowed');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitized: errors.length === 0 ? sanitized : undefined,
+  };
+}
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
@@ -66,7 +235,7 @@ export function validateLLMInput(
   }
 
   // Remove control characters and potentially dangerous content
-  sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, '');
+  sanitized = sanitized.replace(/[\u0000-\u001f\u007f]/g, '');
 
   // HTML/Script sanitization
   if (!options.allowHtml) {
@@ -231,7 +400,7 @@ export function validateFileContent(content: string, filename?: string): Validat
   }
 
   // Check for binary content
-  if (/[\x00-\x08\x0E-\x1F\x7F]/.test(content)) {
+  if (/[\u0000-\u0008\u000e-\u001f\u007f]/.test(content)) {
     errors.push('File appears to contain binary data');
   }
 
