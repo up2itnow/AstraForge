@@ -209,6 +209,61 @@ export function validateProjectIdea(idea: string): ValidationResult {
 }
 
 /**
+ * Sanitize a string for safe use in file paths
+ *
+ * @param input - The input string to sanitize
+ * @param options - Sanitization options
+ * @returns Sanitized string safe for use in file paths
+ */
+export function sanitizeForPath(
+  input: string,
+  options: { maxLength?: number; allowDots?: boolean } = {}
+): string {
+  if (!input || typeof input !== 'string') {
+    return 'untitled';
+  }
+
+  const { maxLength = 100, allowDots = false } = options;
+
+  // Remove or replace dangerous characters for path traversal
+  let sanitized = input
+    // Remove path traversal sequences
+    .replace(/\.\./g, '')
+    .replace(/[/\\]/g, '-')
+    // Remove null bytes and control characters
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    // Remove dangerous characters for file systems
+    .replace(/[<>:"|?*]/g, '')
+    // Replace multiple spaces/dashes with single dash
+    .replace(/[\s-]+/g, '-')
+    // Convert to lowercase for consistency
+    .toLowerCase()
+    // Trim leading/trailing dashes and dots
+    .replace(/^[-.]*/g, '')
+    .replace(/[-]*$/g, '');
+
+  // Remove dots if not allowed (except for file extensions)
+  if (!allowDots) {
+    sanitized = sanitized.replace(/\./g, '');
+  }
+
+  // Ensure it's not empty after sanitization
+  if (!sanitized) {
+    sanitized = 'untitled';
+  }
+
+  // Truncate if too long
+  if (sanitized.length > maxLength) {
+    sanitized = sanitized.substring(0, maxLength);
+  }
+
+  // Ensure it doesn't end with a dot or dash
+  sanitized = sanitized.replace(/[-.]$/g, '');
+
+  return sanitized || 'untitled';
+}
+
+/**
  * Validate file content before processing
  *
  * @param content - File content to validate
