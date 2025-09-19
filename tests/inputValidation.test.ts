@@ -122,6 +122,31 @@ describe('Path Validation', () => {
       const result = createSafePath('/base/dir', '');
       expect(result).toBeNull();
     });
+
+    it('should return null for dangerous basePath with ../ sequences', () => {
+      const result = createSafePath('/base/../dangerous', 'file.txt');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for dangerous basePath with .\\ sequences', () => {
+      const result = createSafePath('/base/.\\dangerous', 'file.txt');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for dangerous basePath with ./ sequences', () => {
+      const result = createSafePath('/base/./dangerous', 'file.txt');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for empty basePath', () => {
+      const result = createSafePath('', 'file.txt');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for null basePath', () => {
+      const result = createSafePath(null as any, 'file.txt');
+      expect(result).toBeNull();
+    });
   });
 
   describe('validateFilename', () => {

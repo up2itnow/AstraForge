@@ -123,6 +123,22 @@ export function validateAndSanitizePath(
  * @returns Safe path or null if validation fails
  */
 export function createSafePath(basePath: string, userPath: string): string | null {
+  // Validate basePath to ensure it doesn't contain dangerous sequences
+  if (!basePath || typeof basePath !== 'string') {
+    return null;
+  }
+  
+  // Check for path traversal sequences in basePath
+  const dangerousPatterns = [
+    /\.\./,           // Directory traversal
+    /\.\\/,           // Windows directory traversal  
+    /\.\//,           // Current directory references (when used maliciously)
+  ];
+  
+  if (dangerousPatterns.some(pattern => pattern.test(basePath))) {
+    return null;
+  }
+  
   const validation = validateAndSanitizePath(userPath, basePath);
   
   if (!validation.isValid || !validation.sanitizedPath) {
