@@ -60,8 +60,14 @@ export class VectorDB {
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
     async save() {
-        const dataPath = path.join(this.storagePath, 'vectors.json');
-        fs.writeFileSync(dataPath, JSON.stringify(this.items, null, 2));
+        try {
+            const dataPath = path.join(this.storagePath, 'vectors.json');
+            fs.writeFileSync(dataPath, JSON.stringify(this.items, null, 2));
+        }
+        catch (error) {
+            console.error('Failed to save vector database:', error);
+            // Don't throw to maintain graceful degradation
+        }
     }
     close() {
         // Cleanup if needed
@@ -151,6 +157,24 @@ export class VectorDB {
             }
         }
         return embeddings;
+    }
+    /**
+     * Add a document with automatic embedding generation
+     * Compatibility method to support existing API usage
+     */
+    async addDocument(id, content, metadata = {}) {
+        try {
+            const embedding = await this.getEmbedding(content);
+            await this.addEmbedding(id, embedding, {
+                content,
+                ...metadata,
+                timestamp: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            console.error(`Failed to add document ${id}:`, error);
+            throw error;
+        }
     }
 }
 //# sourceMappingURL=vectorDB.js.map

@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+// Types are imported for interface compliance but not directly used in this file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ApiTesterCore, TestResult, BatchTestResult, VectorTestResult } from './apiTesterCore';
 
 export class ApiTesterProvider implements vscode.WebviewViewProvider {

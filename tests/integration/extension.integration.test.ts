@@ -63,6 +63,17 @@ describe('AstraForge Extension Integration', () => {
     await vectorDB.init();
   });
 
+  afterEach(async () => {
+    // Clean up any servers or resources
+    try {
+      if (workflowManager && (workflowManager as any).collaborationServer) {
+        await (workflowManager as any).collaborationServer.stop();
+      }
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  });
+
   describe('End-to-End Workflow', () => {
     it('should complete a full project workflow', async () => {
       const projectIdea = 'Build a simple calculator app';
