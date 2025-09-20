@@ -49,18 +49,23 @@ export class CollaborationServer {
     return new Promise((resolve, reject) => {
       // Use dynamic port selection for testing environment
       const port = process.env.NODE_ENV === 'test' ? 0 : this.port;
-      
-      this.server.listen(port, (error: any) => {
-        if (error) {
-          reject(error);
-        } else {
-          // Update actual port if using dynamic allocation
-          if (port === 0) {
-            this.port = (this.server.address() as any)?.port || this.port;
-          }
-          console.log(`Collaboration server started on port ${this.port}`);
-          resolve();
+
+      const handleError = (error: any) => {
+        this.server.off('error', handleError);
+        reject(error);
+      };
+
+      this.server.once('error', handleError);
+
+      this.server.listen(port, () => {
+        this.server.off('error', handleError);
+
+        // Update actual port if using dynamic allocation
+        if (port === 0) {
+          this.port = (this.server.address() as any)?.port || this.port;
         }
+        console.log(`Collaboration server started on port ${this.port}`);
+        resolve();
       });
     });
   }
