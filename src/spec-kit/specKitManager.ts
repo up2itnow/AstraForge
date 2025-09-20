@@ -360,11 +360,16 @@ export class SpecKitManager {
       for (const template of templates) {
         if (typeof template === 'string' && template.endsWith('.md')) {
           const sourcePath = path.join(sourceTemplatesDir, template);
-          const destPath = path.join(templatesDir, template);
-          
+          const destPath = createSafePath(templatesDir, template);
+
+          if (!destPath) {
+            logger.warn(`Skipping template with unsafe path: ${template}`);
+            continue;
+          }
+
           // Ensure destination directory exists
           await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
-          
+
           const content = await fs.promises.readFile(sourcePath, 'utf8');
           await fs.promises.writeFile(destPath, content, 'utf8');
         }
@@ -411,8 +416,13 @@ export class SpecKitManager {
       for (const script of scripts) {
         if (script.endsWith('.ps1')) {
           const sourcePath = path.join(sourceScriptsDir, script);
-          const destPath = path.join(scriptsDir, script);
-          
+          const destPath = createSafePath(scriptsDir, script);
+
+          if (!destPath) {
+            logger.warn(`Skipping script with unsafe path: ${script}`);
+            continue;
+          }
+
           const content = await fs.promises.readFile(sourcePath, 'utf8');
           await fs.promises.writeFile(destPath, content, 'utf8');
         }
