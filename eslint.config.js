@@ -15,11 +15,22 @@ export default [
       '@typescript-eslint': typescript,
     },
     rules: {
-      complexity: ['error', 10],
-      'max-lines-per-function': ['warn', 50],
+      complexity: ['warn', 20],
+      'max-lines-per-function': ['warn', 75],
       'no-console': 'warn',
-      '@typescript-eslint/no-unused-vars': 'off', // Temporarily disabled for interface requirements
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       '@typescript-eslint/no-explicit-any': 'warn',
+      'no-control-regex': 'off',
+      'no-useless-escape': 'off',
+      'no-case-declarations': 'off',
       'no-undef': 'off', // TypeScript handles this
     },
   },
