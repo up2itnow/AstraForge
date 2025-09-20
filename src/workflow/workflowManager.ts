@@ -126,7 +126,7 @@ export class WorkflowManager {
     } catch (error) {
       // Allow retries on subsequent calls if initialization failed
       this.vectorInitialized = false;
-      this.vectorInitPromise = undefined;
+      // Do not reset vectorInitPromise to undefined to prevent race conditions
       throw error;
     }
   }
