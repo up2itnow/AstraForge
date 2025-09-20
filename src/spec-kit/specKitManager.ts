@@ -82,8 +82,16 @@ export class SpecKitManager {
     const scriptsDir = createSafePath(workspaceDir, 'scripts');
     const memoryDir = createSafePath(workspaceDir, 'memory');
 
-    if (!specsDir || !templatesDir || !scriptsDir || !memoryDir) {
-      throw new Error('Failed to resolve safe Spec Kit directories');
+    const failedDirs: string[] = [];
+    if (!specsDir) failedDirs.push('specsDir');
+    if (!templatesDir) failedDirs.push('templatesDir');
+    if (!scriptsDir) failedDirs.push('scriptsDir');
+    if (!memoryDir) failedDirs.push('memoryDir');
+    if (failedDirs.length > 0) {
+      throw new Error(
+        `Failed to resolve safe paths for Spec Kit directories: ${failedDirs.join(', ')}. ` +
+        'Check workspace permissions and path validity.'
+      );
     }
 
     // Create directory structure
