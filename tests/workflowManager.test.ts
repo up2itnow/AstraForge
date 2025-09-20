@@ -59,7 +59,7 @@ describe('WorkflowManager', () => {
     } as any;
 
     mockVector = {
-      init: jest.fn(),
+      init: jest.fn().mockResolvedValue(undefined),
       getEmbedding: jest.fn(),
       queryEmbedding: jest.fn(),
       addEmbedding: jest.fn(),
@@ -79,12 +79,22 @@ describe('WorkflowManager', () => {
   describe('Initialization', () => {
     it('should initialize with all required managers', () => {
       expect(workflowManager).toBeInstanceOf(WorkflowManager);
-      expect(mockVector.init).toHaveBeenCalled();
     });
 
     it('should initialize RL and collaboration systems', () => {
       // Test that the workflow manager sets up its internal systems
       expect(workflowManager).toBeDefined();
+    });
+
+    it('initializes the vector database on first workflow start', async () => {
+      mockVector.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
+      mockVector.queryEmbedding.mockResolvedValue([]);
+      mockGit.commit.mockResolvedValue(undefined);
+
+      await workflowManager.startWorkflow('Initialize vector DB');
+
+      expect(mockVector.init).toHaveBeenCalledTimes(1);
+      expect(mockVector.getEmbedding).toHaveBeenCalled();
     });
   });
 

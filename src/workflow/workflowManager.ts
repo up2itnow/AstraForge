@@ -80,7 +80,7 @@ export class WorkflowManager {
   constructor(
     private llmManager: LLMManager,
     private vectorDB: VectorDB,
-    private gitManager: GitManager
+  private gitManager: GitManager
   ) {
     this.workflowRL = new AdaptiveWorkflowRL();
     this.workspaceId = `workspace_${Date.now()}`;
@@ -93,6 +93,42 @@ export class WorkflowManager {
     };
 
     this.initializeCollaboration();
+  }
+
+  /** Tracks whether the vector database has been initialized */
+  private vectorInitialized = false;
+
+  /** Shared initialization promise to prevent duplicate init calls */
+  private vectorInitPromise?: Promise<void>;
+
+  /**
+   * Ensure the vector database is initialized before use
+   */
+  private async ensureVectorReady(): Promise<void> {
+    if (this.vectorInitialized) {
+      return;
+    }
+
+    if (!this.vectorInitPromise) {
+      this.vectorInitPromise = (async () => {
+        try {
+          await this.vectorDB.init();
+          this.vectorInitialized = true;
+        } catch (error) {
+          console.error('Vector DB initialization failed:', error);
+          throw error;
+        }
+      })();
+    }
+
+    try {
+      await this.vectorInitPromise;
+    } catch (error) {
+      // Allow retries on subsequent calls if initialization failed
+      this.vectorInitialized = false;
+      this.vectorInitPromise = undefined;
+      throw error;
+    }
   }
 
   /**
@@ -145,6 +181,7 @@ export class WorkflowManager {
       }
 
       // Store in vector DB
+      await this.ensureVectorReady();
       const embedding = await this.vectorDB.getEmbedding(this.buildPlan);
       await this.vectorDB.addEmbedding('buildPlan', embedding, { plan: this.buildPlan });
 
@@ -183,6 +220,7 @@ export class WorkflowManager {
 
       // Enhanced context retrieval using vector DB
       const contextQuery = `${phase} for ${this.projectIdea}`;
+      await this.ensureVectorReady();
       const contextEmbedding = await this.vectorDB.getEmbedding(contextQuery);
       const relevantContext = await this.vectorDB.queryEmbedding(contextEmbedding, 3);
 
