@@ -53,20 +53,20 @@ describe('WorkflowManager', () => {
 
     // Setup mocks
     mockLLM = {
-      conference: jest.fn(),
-      queryLLM: jest.fn(),
-      voteOnDecision: jest.fn(),
+      conference: jest.fn().mockResolvedValue('LLM conference response'),
+      queryLLM: jest.fn().mockResolvedValue('LLM query response'),
+      voteOnDecision: jest.fn().mockResolvedValue('Approve Plan'),
     } as any;
 
     mockVector = {
-      init: jest.fn(),
-      getEmbedding: jest.fn(),
-      queryEmbedding: jest.fn(),
-      addEmbedding: jest.fn(),
+      init: jest.fn().mockResolvedValue(undefined),
+      getEmbedding: jest.fn().mockResolvedValue([1, 2, 3, 4]),
+      queryEmbedding: jest.fn().mockResolvedValue([]),
+      addEmbedding: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     mockGit = {
-      commit: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     mockLLMManager.mockImplementation(() => mockLLM);
@@ -74,6 +74,9 @@ describe('WorkflowManager', () => {
     mockGitManager.mockImplementation(() => mockGit);
 
     workflowManager = new WorkflowManager(mockLLM, mockVector, mockGit);
+
+    (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('Proceed as planned');
+    (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
   });
 
   describe('Initialization', () => {

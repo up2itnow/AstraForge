@@ -33,6 +33,12 @@ interface WorkflowMetrics {
   iterations: number;
 }
 
+type WorkflowActionRecommendation = {
+  type: 'continue' | 'skip' | 'repeat' | 'branch' | 'optimize';
+  target?: string;
+  confidence: number;
+};
+
 /**
  * Main workflow orchestrator that manages the complete development lifecycle
  *
@@ -92,6 +98,12 @@ export class WorkflowManager {
       iterations: 0,
     };
 
+    if (typeof (this.vectorDB as any).init === 'function') {
+      void this.vectorDB.init().catch(error =>
+        console.warn('Vector DB initialization failed:', error)
+      );
+    }
+
     this.initializeCollaboration();
   }
 
@@ -124,10 +136,18 @@ export class WorkflowManager {
         `Discuss project: ${prompt}. Propose tech stack, estimates, plan.`
       );
 
+      if (discussion.includes('Error querying LLM')) {
+        throw new Error('LLM conference failed due to provider error');
+      }
+
       this.buildPlan = await this.llmManager.voteOnDecision(discussion, [
         'Approve Plan',
         'Need Questions',
       ]);
+
+      if (!this.buildPlan) {
+        this.buildPlan = 'Approve Plan';
+      }
 
       if (this.buildPlan === 'Need Questions') {
         const questions = await this.llmManager.queryLLM(
@@ -151,7 +171,7 @@ export class WorkflowManager {
       vscode.window.showInformationMessage('Build Plan ready! Proceeding to phases.');
       await this.executePhase();
     } catch (error: any) {
-      vscode.window.showErrorMessage(`Workflow failed: ${error.message}`);
+      await this.handlePhaseError(error, this.phases[this.currentPhase] ?? 'Planning');
     }
   }
 
@@ -164,7 +184,12 @@ export class WorkflowManager {
       const currentState = this.getCurrentWorkflowState();
 
       // Get RL recommendation for next action
-      const recommendedAction = this.workflowRL.getBestAction(currentState);
+      const recommendedAction: WorkflowActionRecommendation = this.workflowRL?.getBestAction
+        ? (this.workflowRL.getBestAction(currentState) as WorkflowActionRecommendation) ?? {
+            type: 'continue',
+            confidence: 1,
+          }
+        : { type: 'continue', confidence: 1 };
 
       // Apply RL action if not 'continue'
       if (recommendedAction.type !== 'continue') {
@@ -196,6 +221,10 @@ export class WorkflowManager {
       const phasePrompt = this.buildEnhancedPrompt(phase, contextText);
       const output = await this.llmManager.conference(phasePrompt);
 
+      if (output.includes('Error querying LLM')) {
+        throw new Error('Phase generation failed due to LLM error');
+      }
+
       // Process and validate output
       const processedOutput = await this.processPhaseOutput(output, phase);
 
@@ -226,15 +255,17 @@ export class WorkflowManager {
 
       // Update RL with feedback
       const newState = this.getCurrentWorkflowState();
-      const reward = this.workflowRL.calculateReward(
-        currentState,
-        recommendedAction,
-        newState,
-        true, // Phase succeeded
-        userFeedback
-      );
+      if (this.workflowRL?.calculateReward && this.workflowRL?.updateQValue) {
+        const reward = this.workflowRL.calculateReward(
+          currentState,
+          recommendedAction,
+          newState,
+          true, // Phase succeeded
+          userFeedback
+        );
 
-      this.workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
+        this.workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
+      }
 
       // Store phase results in vector DB for future context
       await this.storePhaseContext(phase, processedOutput, review);
@@ -300,7 +331,9 @@ export class WorkflowManager {
       this.projectIdea.toLowerCase().includes(keyword)
     ).length;
 
-    return Math.min(1, (ideaLength / 500 + matches / complexityKeywords.length) / 2);
+    const lengthScore = Math.min(1, ideaLength / 400);
+    const keywordScore = matches / complexityKeywords.length;
+    return Math.min(1, lengthScore * 0.3 + keywordScore * 0.7);
   }
 
   private calculateUserSatisfaction(): number {
@@ -493,7 +526,12 @@ export class WorkflowManager {
     const errorMessage = `Phase ${phase} encountered an error: ${error.message}`;
     const options = ['Retry phase', 'Skip phase', 'Abort workflow'];
 
-    const choice = await vscode.window.showErrorMessage(errorMessage, ...options);
+    let choice = await vscode.window.showErrorMessage(errorMessage, ...options);
+
+    if (choice === 'Retry phase' && this.metrics.errors > 3) {
+      vscode.window.showErrorMessage('Maximum retry attempts reached. Skipping phase.');
+      choice = 'Skip phase';
+    }
 
     switch (choice) {
       case 'Retry phase':
@@ -519,7 +557,11 @@ export class WorkflowManager {
     try {
       // Generate comprehensive final report with metrics
       const totalTime = Date.now() - this.metrics.startTime;
-      const rlStats = this.workflowRL.getStats();
+      const rlStatsRaw = this.workflowRL?.getStats ? this.workflowRL.getStats() : null;
+      const rlStats =
+        rlStatsRaw && typeof rlStatsRaw === 'object'
+          ? rlStatsRaw
+          : { totalStates: 0, totalActions: 0, explorationRate: 0 };
 
       const report = await this.llmManager.queryLLM(
         0,
@@ -543,9 +585,9 @@ export class WorkflowManager {
 - **Average User Satisfaction**: ${this.calculateUserSatisfaction().toFixed(2)}
 
 ### AI Learning Metrics
-- **RL States Explored**: ${rlStats.totalStates}
-- **Actions Learned**: ${rlStats.totalActions}
-- **Current Exploration Rate**: ${rlStats.explorationRate.toFixed(3)}
+- **RL States Explored**: ${rlStats.totalStates ?? 0}
+- **Actions Learned**: ${rlStats.totalActions ?? 0}
+- **Current Exploration Rate**: ${Number(rlStats.explorationRate ?? 0).toFixed(3)}
 
 ## Project Report
 ${report}
@@ -561,18 +603,17 @@ ${bonuses}
         '🎉 Project Complete! Check the final report for details and enhancements.'
       );
 
-      // Save comprehensive final report
-      if (vscode.workspace.workspaceFolders) {
-        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-        const reportPath = vscode.Uri.file(
-          path.join(workspaceRoot, 'astraforge_output', 'FINAL_REPORT.md')
-        );
-        await vscode.workspace.fs.writeFile(reportPath, Buffer.from(finalReport));
+      const workspaceRoot =
+        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+      const outputDir = path.join(workspaceRoot, 'astraforge_output');
+      const outputDirUri = vscode.Uri.file(outputDir);
+      await vscode.workspace.fs.createDirectory(outputDirUri);
 
-        // Open the report
-        const doc = await vscode.workspace.openTextDocument(reportPath);
-        await vscode.window.showTextDocument(doc);
-      }
+      const reportPath = vscode.Uri.file(path.join(outputDir, 'FINAL_REPORT.md'));
+      await vscode.workspace.fs.writeFile(reportPath, Buffer.from(finalReport));
+
+      const doc = await vscode.workspace.openTextDocument(reportPath);
+      await vscode.window.showTextDocument(doc);
 
       // Notify collaboration server
       this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'project_completed', {

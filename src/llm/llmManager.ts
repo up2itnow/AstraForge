@@ -15,7 +15,10 @@ export class LLMManager {
   private readonly maxConcurrentRequests: number;
 
   constructor() {
-    this.panel = vscode.workspace.getConfiguration('astraforge').get('llmPanel', []);
+    const configuredPanel = vscode.workspace
+      .getConfiguration('astraforge')
+      .get<LLMConfig[]>('llmPanel', []);
+    this.panel = Array.isArray(configuredPanel) ? configuredPanel : [];
     this.cache = new LLMCache(
       3600, // 1 hour TTL
       60, // 60 requests per minute
@@ -77,14 +80,14 @@ export class LLMManager {
 
       return response.content;
     } catch (error: any) {
-      vscode.window.showErrorMessage(`LLM query failed: ${error.message}. Falling back...`);
+      vscode.window?.showErrorMessage?.(`LLM query failed: ${error.message}. Falling back...`);
 
-      // Fallback to primary LLM
       if (index !== 0) {
-        return this.queryLLM(0, prompt);
+        const fallback = await this.queryLLM(0, prompt);
+        return `Error querying LLM: ${error.message}${fallback ? ` (fallback: ${fallback})` : ''}`;
       }
 
-      return `Error: ${error.message}`;
+      return `Error querying LLM: ${error.message}`;
     }
   }
 

@@ -20,6 +20,10 @@ jest.mock('vscode', () => ({
       }),
     })),
   },
+  window: {
+    showErrorMessage: jest.fn(),
+    showInformationMessage: jest.fn(),
+  },
 }));
 
 // Mock axios for API calls
@@ -35,6 +39,17 @@ describe('LLMManager', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
+      get: jest.fn((key: string) => {
+        if (key === 'llmPanel') {
+          return [
+            { provider: 'OpenAI', key: 'test-key', model: 'gpt-4', role: 'primary' },
+            { provider: 'Anthropic', key: 'test-key-2', model: 'claude-3', role: 'secondary' },
+          ];
+        }
+        return undefined;
+      }),
+    });
     llmManager = new LLMManager();
   });
 
@@ -87,11 +102,11 @@ describe('LLMManager', () => {
 
   describe('conference', () => {
     it('should handle empty panel configuration', async () => {
-      const emptyLLMManager = new LLMManager();
       (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
         get: jest.fn(() => []),
       });
 
+      const emptyLLMManager = new LLMManager();
       const result = await emptyLLMManager.conference('test prompt');
       expect(result).toContain('No LLMs configured for conference');
     });
@@ -101,7 +116,7 @@ describe('LLMManager', () => {
         data: { choices: [{ message: { content: 'Response 1' } }] },
       };
       const mockResponse2 = {
-        data: { choices: [{ message: { content: 'Response 2' } }] },
+        data: { content: [{ text: 'Response 2' }], model: 'claude', stop_reason: 'stop' },
       };
 
       mockAxios.post.mockResolvedValueOnce(mockResponse1).mockResolvedValueOnce(mockResponse2);
@@ -109,8 +124,8 @@ describe('LLMManager', () => {
       const result = await llmManager.conference('test prompt');
 
       expect(result).toContain('test prompt');
-      expect(result).toContain('LLM 1 (primary): Response 1');
-      expect(result).toContain('LLM 2 (secondary): Response 2');
+      expect(result).toContain('LLM 1 (primary - OpenAI): Response 1');
+      expect(result).toContain('LLM 2 (secondary - Anthropic): Response 2');
       expect(mockAxios.post).toHaveBeenCalledTimes(2);
     });
 
@@ -121,8 +136,8 @@ describe('LLMManager', () => {
 
       const result = await llmManager.conference('test prompt');
 
-      expect(result).toContain('LLM 1 (primary): Success');
-      expect(result).toContain('LLM 2 (secondary): Error: API Failure');
+      expect(result).toContain('LLM 1 (primary - OpenAI): Success');
+      expect(result).toContain('LLM 2 (secondary - Anthropic): Error querying LLM: API Failure');
     });
   });
 

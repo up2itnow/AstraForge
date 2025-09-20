@@ -29,6 +29,7 @@ export class LLMCache {
   private readonly ttl: number;
   private readonly maxRequests: number;
   private readonly windowMs: number;
+  private cleanupInterval?: NodeJS.Timeout;
 
   constructor(
     ttlSeconds: number = 3600,
@@ -39,8 +40,11 @@ export class LLMCache {
     this.maxRequests = maxRequestsPerMinute;
     this.windowMs = windowMs;
 
-    // Cleanup expired entries every 5 minutes
-    setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    // Cleanup expired entries every 5 minutes. In test environments we
+    // still schedule cleanup but immediately "unref" the timer so it doesn't
+    // keep the process alive (avoids Jest open handle warnings).
+    this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    this.cleanupInterval.unref?.();
   }
 
   /**
@@ -136,6 +140,10 @@ export class LLMCache {
   clear(): void {
     this.cache.clear();
     this.throttle.clear();
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
   }
 
   /**

@@ -44,25 +44,31 @@ jest.mock('vscode', () => ({
 }));
 
 // Mock provider module
-jest.mock('../src/llm/providers', () => ({
-  createProvider: jest.fn((providerName: string) => {
-    const mockProvider: LLMProvider = {
-      query: jest.fn().mockResolvedValue({
-        content: `Mock response from ${providerName}`,
-        usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
-        metadata: { model: 'mock-model' },
-      }),
-      validateConfig: jest.fn().mockResolvedValue(true),
-      getAvailableModels: jest
-        .fn()
-        .mockResolvedValue([
-          `${providerName.toLowerCase()}-model-1`,
-          `${providerName.toLowerCase()}-model-2`,
-        ]),
-    };
-    return mockProvider;
-  }),
-}));
+jest.mock('../src/llm/providers', () => {
+  const providerInstances: Record<string, jest.Mocked<LLMProvider>> = {};
+
+  const createProvider = jest.fn((providerName: string) => {
+    if (!providerInstances[providerName]) {
+      providerInstances[providerName] = {
+        query: jest.fn().mockResolvedValue({
+          content: `Mock response from ${providerName}`,
+          usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+          metadata: { model: 'mock-model' },
+        }),
+        validateConfig: jest.fn().mockResolvedValue(true),
+        getAvailableModels: jest
+          .fn()
+          .mockResolvedValue([
+            `${providerName.toLowerCase()}-model-1`,
+            `${providerName.toLowerCase()}-model-2`,
+          ]),
+      } as jest.Mocked<LLMProvider>;
+    }
+    return providerInstances[providerName];
+  });
+
+  return { createProvider, __providerInstances: providerInstances };
+});
 
 // Mock cache module
 jest.mock('../src/llm/cache', () => ({
@@ -113,25 +119,26 @@ describe('LLMManager (Refactored)', () => {
 
       const result = await llmManager.queryLLM(1, 'Test prompt');
       // Should fallback to index 0 (OpenAI)
-      expect(result).toBe('Mock response from OpenAI');
+      expect(result).toContain('Mock response from OpenAI');
     });
 
     it('should use cached response when available', async () => {
-      const { LLMCache } = require('../src/llm/cache');
-      const mockCache = new LLMCache();
-      mockCache.get.mockReturnValueOnce({ response: 'Cached response', timestamp: Date.now() });
-
       // Create new manager to get fresh cache instance
       const newManager = new LLMManager();
+      const cache = (newManager as any).cache as {
+        get: jest.Mock;
+      };
+      cache.get.mockReturnValueOnce({ response: 'Cached response', timestamp: Date.now() });
       const result = await newManager.queryLLM(0, 'Test prompt');
 
-      expect(result).toBe('Mock response from OpenAI'); // Since we're mocking, this will still be the mock response
+      expect(result).toBe('Cached response');
     });
 
     it('should handle throttling', async () => {
-      const { LLMCache } = require('../src/llm/cache');
-      const mockCache = new LLMCache();
-      mockCache.isThrottled.mockReturnValueOnce(true);
+      const cache = (llmManager as any).cache as {
+        isThrottled: jest.Mock;
+      };
+      cache.isThrottled.mockReturnValueOnce(true);
 
       const result = await llmManager.queryLLM(0, 'Test prompt');
       expect(result).toBe('Rate limit exceeded. Please try again later.');
@@ -220,11 +227,9 @@ describe('LLMManager (Refactored)', () => {
     });
 
     it('should clear cache', () => {
-      const { LLMCache } = require('../src/llm/cache');
-      const mockCache = new LLMCache();
-
       llmManager.clearCache();
-      expect(mockCache.clear).toHaveBeenCalled();
+      const cache = (llmManager as any).cache as { clear: jest.Mock };
+      expect(cache.clear).toHaveBeenCalled();
     });
   });
 

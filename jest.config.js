@@ -2,7 +2,7 @@ export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts'],
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   modulePathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/out/'],
@@ -31,4 +31,5 @@ export default {
   testTimeout: 30000,
   forceExit: true,
   detectOpenHandles: true,
+  maxWorkers: 1,
 };
