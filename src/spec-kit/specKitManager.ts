@@ -353,64 +353,26 @@ export class SpecKitManager {
 
   private async copySpecKitTemplates(templatesDir: string): Promise<void> {
     const sourceTemplatesDir = path.join(__dirname, '../../temp_spec_kit/templates');
-    
+
     const resolvedSourceDir = path.resolve(sourceTemplatesDir);
     const resolvedDestDir = path.resolve(templatesDir);
-    const normalizedSourceDir = resolvedSourceDir.endsWith(path.sep)
-      ? resolvedSourceDir
-      : `${resolvedSourceDir}${path.sep}`;
-    const normalizedDestDir = resolvedDestDir.endsWith(path.sep)
-      ? resolvedDestDir
-      : `${resolvedDestDir}${path.sep}`;
+    const normalizedSourceDir = this.ensureTrailingSeparator(resolvedSourceDir);
+    const normalizedDestDir = this.ensureTrailingSeparator(resolvedDestDir);
 
     try {
-      const templates = await fs.promises.readdir(sourceTemplatesDir, { recursive: true });
-
-      for (const template of templates) {
-        if (typeof template === 'string' && template.endsWith('.md')) {
-          const sourcePath = createSafePath(resolvedSourceDir, template);
-          if (!sourcePath) {
-            logger.warn(`Skipping template with unsafe source path: ${template}`);
-            continue;
-          }
-
-          let realSourcePath: string;
-          try {
-            realSourcePath = await fs.promises.realpath(sourcePath);
-          } catch (error) {
-            logger.warn(`Skipping template with unreadable source path: ${template}`);
-            continue;
-          }
-
-          if (
-            realSourcePath !== resolvedSourceDir &&
-            !realSourcePath.startsWith(normalizedSourceDir)
-          ) {
-            logger.warn(`Skipping template escaping source directory: ${template}`);
-            continue;
-          }
-
-          const destPath = createSafePath(resolvedDestDir, template);
-          if (!destPath) {
-            logger.warn(`Skipping template with unsafe destination path: ${template}`);
-            continue;
-          }
-
-          const resolvedDestPath = path.resolve(destPath);
-          if (
-            resolvedDestPath !== resolvedDestDir &&
-            !resolvedDestPath.startsWith(normalizedDestDir)
-          ) {
-            logger.warn(`Skipping template escaping destination directory: ${template}`);
-            continue;
-          }
-
-          // Ensure destination directory exists
-          await fs.promises.mkdir(path.dirname(resolvedDestPath), { recursive: true });
-
-          const content = await fs.promises.readFile(realSourcePath, 'utf8');
-          await fs.promises.writeFile(resolvedDestPath, content, 'utf8');
+      for await (const relativePath of this.walkDirectory(resolvedSourceDir)) {
+        if (!relativePath.endsWith('.md')) {
+          continue;
         }
+
+        await this.copyFileWithGuards(
+          relativePath,
+          resolvedSourceDir,
+          normalizedSourceDir,
+          resolvedDestDir,
+          normalizedDestDir,
+          'template'
+        );
       }
     } catch (error) {
       console.error('Error copying templates:', error);
@@ -447,65 +409,101 @@ export class SpecKitManager {
 
   private async copySpecKitScripts(scriptsDir: string): Promise<void> {
     const sourceScriptsDir = path.join(__dirname, '../../temp_spec_kit/scripts/powershell');
-    
+
     const resolvedSourceDir = path.resolve(sourceScriptsDir);
     const resolvedDestDir = path.resolve(scriptsDir);
-    const normalizedSourceDir = resolvedSourceDir.endsWith(path.sep)
-      ? resolvedSourceDir
-      : `${resolvedSourceDir}${path.sep}`;
-    const normalizedDestDir = resolvedDestDir.endsWith(path.sep)
-      ? resolvedDestDir
-      : `${resolvedDestDir}${path.sep}`;
+    const normalizedSourceDir = this.ensureTrailingSeparator(resolvedSourceDir);
+    const normalizedDestDir = this.ensureTrailingSeparator(resolvedDestDir);
 
     try {
-      const scripts = await fs.promises.readdir(sourceScriptsDir);
+      const scripts = await fs.promises.readdir(sourceScriptsDir, { withFileTypes: true });
 
       for (const script of scripts) {
-        if (script.endsWith('.ps1')) {
-          const sourcePath = createSafePath(resolvedSourceDir, script);
-          if (!sourcePath) {
-            logger.warn(`Skipping script with unsafe source path: ${script}`);
-            continue;
-          }
-
-          let realSourcePath: string;
-          try {
-            realSourcePath = await fs.promises.realpath(sourcePath);
-          } catch (error) {
-            logger.warn(`Skipping script with unreadable source path: ${script}`);
-            continue;
-          }
-
-          if (
-            realSourcePath !== resolvedSourceDir &&
-            !realSourcePath.startsWith(normalizedSourceDir)
-          ) {
-            logger.warn(`Skipping script escaping source directory: ${script}`);
-            continue;
-          }
-
-          const destPath = createSafePath(resolvedDestDir, script);
-          if (!destPath) {
-            logger.warn(`Skipping script with unsafe destination path: ${script}`);
-            continue;
-          }
-
-          const resolvedDestPath = path.resolve(destPath);
-          if (
-            resolvedDestPath !== resolvedDestDir &&
-            !resolvedDestPath.startsWith(normalizedDestDir)
-          ) {
-            logger.warn(`Skipping script escaping destination directory: ${script}`);
-            continue;
-          }
-
-          const content = await fs.promises.readFile(realSourcePath, 'utf8');
-          await fs.promises.writeFile(resolvedDestPath, content, 'utf8');
+        if (!script.isFile() || !script.name.endsWith('.ps1')) {
+          continue;
         }
+
+        await this.copyFileWithGuards(
+          script.name,
+          resolvedSourceDir,
+          normalizedSourceDir,
+          resolvedDestDir,
+          normalizedDestDir,
+          'script'
+        );
       }
     } catch (error) {
       console.error('Error copying scripts:', error);
     }
+  }
+
+  private ensureTrailingSeparator(directory: string): string {
+    return directory.endsWith(path.sep) ? directory : `${directory}${path.sep}`;
+  }
+
+  private async *walkDirectory(baseDir: string, relative = ''): AsyncGenerator<string> {
+    const currentDir = relative ? path.join(baseDir, relative) : baseDir;
+    const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) {
+        logger.warn(`Skipping symbolic link while copying SpecKit assets: ${entry.name}`);
+        continue;
+      }
+
+      const entryRelativePath = relative ? path.join(relative, entry.name) : entry.name;
+
+      if (entry.isDirectory()) {
+        yield* this.walkDirectory(baseDir, entryRelativePath);
+      } else if (entry.isFile()) {
+        yield entryRelativePath;
+      }
+    }
+  }
+
+  private async copyFileWithGuards(
+    relativePath: string,
+    resolvedSourceDir: string,
+    normalizedSourceDir: string,
+    resolvedDestDir: string,
+    normalizedDestDir: string,
+    assetType: 'template' | 'script'
+  ): Promise<void> {
+    const sourcePath = createSafePath(resolvedSourceDir, relativePath);
+    if (!sourcePath) {
+      logger.warn(`Skipping ${assetType} with unsafe source path: ${relativePath}`);
+      return;
+    }
+
+    let realSourcePath: string;
+    try {
+      realSourcePath = await fs.promises.realpath(sourcePath);
+    } catch (error) {
+      logger.warn(`Skipping ${assetType} with unreadable source path: ${relativePath}`);
+      return;
+    }
+
+    if (realSourcePath !== resolvedSourceDir && !realSourcePath.startsWith(normalizedSourceDir)) {
+      logger.warn(`Skipping ${assetType} escaping source directory: ${relativePath}`);
+      return;
+    }
+
+    const destPath = createSafePath(resolvedDestDir, relativePath);
+    if (!destPath) {
+      logger.warn(`Skipping ${assetType} with unsafe destination path: ${relativePath}`);
+      return;
+    }
+
+    const resolvedDestPath = path.resolve(destPath);
+    if (resolvedDestPath !== resolvedDestDir && !resolvedDestPath.startsWith(normalizedDestDir)) {
+      logger.warn(`Skipping ${assetType} escaping destination directory: ${relativePath}`);
+      return;
+    }
+
+    await fs.promises.mkdir(path.dirname(resolvedDestPath), { recursive: true });
+
+    const content = await fs.promises.readFile(realSourcePath, 'utf8');
+    await fs.promises.writeFile(resolvedDestPath, content, 'utf8');
   }
 
   private async createAstraForgeConstitution(memoryDir: string): Promise<void> {
