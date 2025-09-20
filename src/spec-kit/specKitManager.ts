@@ -94,12 +94,19 @@ export class SpecKitManager {
       );
     }
 
-    const [safeSpecsDir, safeTemplatesDir, safeScriptsDir, safeMemoryDir] = [
-      specsDir,
-      templatesDir,
-      scriptsDir,
-      memoryDir,
-    ];
+    const ensureSafePath = (value: string | null, name: string): string => {
+      if (!value) {
+        throw new Error(
+          `Failed to resolve safe path for ${name}. Check workspace permissions and path validity.`
+        );
+      }
+      return value;
+    };
+
+    const safeSpecsDir = ensureSafePath(specsDir, 'specsDir');
+    const safeTemplatesDir = ensureSafePath(templatesDir, 'templatesDir');
+    const safeScriptsDir = ensureSafePath(scriptsDir, 'scriptsDir');
+    const safeMemoryDir = ensureSafePath(memoryDir, 'memoryDir');
 
     // Create directory structure
     await this.createDirectoryStructure([
