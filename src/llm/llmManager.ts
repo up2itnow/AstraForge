@@ -15,7 +15,11 @@ export class LLMManager {
   private readonly maxConcurrentRequests: number;
 
   constructor() {
-    this.panel = vscode.workspace.getConfiguration('astraforge').get('llmPanel', []);
+    const panelConfig = vscode.workspace
+      .getConfiguration('astraforge')
+      .get<LLMConfig[] | undefined>('llmPanel');
+
+    this.panel = Array.isArray(panelConfig) ? panelConfig : [];
     this.cache = new LLMCache(
       3600, // 1 hour TTL
       60, // 60 requests per minute
@@ -32,6 +36,10 @@ export class LLMManager {
    * Initialize providers for all configured LLMs
    */
   private initializeProviders(): void {
+    if (this.panel.length === 0) {
+      return;
+    }
+
     for (const config of this.panel) {
       if (!this.providers.has(config.provider)) {
         try {
