@@ -114,7 +114,15 @@ export class SpecKitManager {
     const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
     
     // Sanitize the spec title to prevent path traversal
-    const sanitizedTitle = spec.title.toLowerCase().replace(/[^a-z0-9\-_]/g, '-').replace(/-+/g, '-');
+    let sanitizedTitle = spec.title
+      .toLowerCase()
+      .replace(/[^a-z0-9\-_]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    if (!sanitizedTitle) {
+      sanitizedTitle = 'feature';
+    }
     const specDirName = `${workflowId}-${sanitizedTitle}`;
     
     // Validate the directory name
@@ -160,7 +168,10 @@ export class SpecKitManager {
     
     // Auto-commit if enabled
     if (this.config.autoCommit) {
-      await this.gitManager.addAndCommit([specPath], `Add specification: ${spec.title}`);
+      const filesToCommit = this.getGitRelativePaths(workspaceDir, [specPath]);
+      if (filesToCommit.length > 0) {
+        await this.gitManager.addAndCommit(filesToCommit, `Add specification: ${spec.title}`);
+      }
     }
     
     // Show results to user
@@ -234,9 +245,18 @@ export class SpecKitManager {
     
     // Auto-commit if enabled
     if (this.config.autoCommit) {
-      await this.gitManager.addAndCommit([
-        planPath, researchPath, dataModelPath, contractsDir
-      ], `Add implementation plan: ${workflow.featureName}`);
+      const filesToCommit = this.getGitRelativePaths(workflow.workspaceDir, [
+        planPath,
+        researchPath,
+        dataModelPath,
+        contractsDir
+      ]);
+      if (filesToCommit.length > 0) {
+        await this.gitManager.addAndCommit(
+          filesToCommit,
+          `Add implementation plan: ${workflow.featureName}`
+        );
+      }
     }
     
     // Show results
@@ -288,7 +308,10 @@ export class SpecKitManager {
     
     // Auto-commit if enabled
     if (this.config.autoCommit) {
-      await this.gitManager.addAndCommit([tasksPath], `Add task list: ${workflow.featureName}`);
+      const filesToCommit = this.getGitRelativePaths(workflow.workspaceDir, [tasksPath]);
+      if (filesToCommit.length > 0) {
+        await this.gitManager.addAndCommit(filesToCommit, `Add task list: ${workflow.featureName}`);
+      }
     }
     
     // Show results
@@ -325,7 +348,10 @@ export class SpecKitManager {
     
     // Auto-commit if enabled
     if (this.config.autoCommit) {
-      await this.gitManager.addAndCommit([specPath], `Refine specification: ${workflow.featureName}`);
+      const filesToCommit = this.getGitRelativePaths(workflow.workspaceDir, [specPath]);
+      if (filesToCommit.length > 0) {
+        await this.gitManager.addAndCommit(filesToCommit, `Refine specification: ${workflow.featureName}`);
+      }
     }
     
     vscode.window.showInformationMessage('✅ Specification refined successfully!');
@@ -695,5 +721,26 @@ All code reviews verify constitutional compliance.
     };
 
     await processDirectory(resolvedSource, '');
+  }
+
+  private getGitRelativePaths(workspaceDir: string, pathsToAdd: string[]): string[] {
+    const safePaths: string[] = [];
+
+    for (const targetPath of pathsToAdd) {
+      if (!targetPath) {
+        continue;
+      }
+
+      const relativePath = path.relative(workspaceDir, targetPath);
+
+      if (!relativePath || relativePath.startsWith('..')) {
+        logger.warn(`Skipping path outside workspace for git commit: ${targetPath}`);
+        continue;
+      }
+
+      safePaths.push(relativePath.replace(/\\/g, '/'));
+    }
+
+    return safePaths;
   }
 }
