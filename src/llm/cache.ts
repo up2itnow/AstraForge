@@ -4,6 +4,7 @@
  */
 
 import * as crypto from 'crypto';
+import { clearInterval, setInterval } from 'node:timers';
 
 interface CacheEntry {
   response: string;
@@ -29,6 +30,7 @@ export class LLMCache {
   private readonly ttl: number;
   private readonly maxRequests: number;
   private readonly windowMs: number;
+  private cleanupTimer: NodeJS.Timeout | null = null;
 
   constructor(
     ttlSeconds: number = 3600,
@@ -39,8 +41,7 @@ export class LLMCache {
     this.maxRequests = maxRequestsPerMinute;
     this.windowMs = windowMs;
 
-    // Cleanup expired entries every 5 minutes
-    setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    this.startCleanupTimer();
   }
 
   /**
@@ -136,6 +137,35 @@ export class LLMCache {
   clear(): void {
     this.cache.clear();
     this.throttle.clear();
+  }
+
+  private startCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      return;
+    }
+
+    const timer = setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    if (typeof timer.unref === 'function') {
+      timer.unref();
+    }
+
+    this.cleanupTimer = timer;
+  }
+
+  private stopCleanupTimer(): void {
+    if (!this.cleanupTimer) {
+      return;
+    }
+
+    clearInterval(this.cleanupTimer);
+    this.cleanupTimer = null;
+  }
+
+  /**
+   * Dispose of background timers (primarily for tests)
+   */
+  dispose(): void {
+    this.stopCleanupTimer();
   }
 
   /**
