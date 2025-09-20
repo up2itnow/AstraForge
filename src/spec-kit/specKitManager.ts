@@ -94,17 +94,29 @@ export class SpecKitManager {
       );
     }
 
+    const [safeSpecsDir, safeTemplatesDir, safeScriptsDir, safeMemoryDir] = [
+      specsDir,
+      templatesDir,
+      scriptsDir,
+      memoryDir,
+    ];
+
     // Create directory structure
-    await this.createDirectoryStructure([specsDir, templatesDir, scriptsDir, memoryDir]);
-    
+    await this.createDirectoryStructure([
+      safeSpecsDir,
+      safeTemplatesDir,
+      safeScriptsDir,
+      safeMemoryDir,
+    ]);
+
     // Copy templates from spec-kit
-    await this.copySpecKitTemplates(templatesDir);
-    
+    await this.copySpecKitTemplates(safeTemplatesDir);
+
     // Copy scripts
-    await this.copySpecKitScripts(scriptsDir);
-    
+    await this.copySpecKitScripts(safeScriptsDir);
+
     // Create AstraForge constitution
-    await this.createAstraForgeConstitution(memoryDir);
+    await this.createAstraForgeConstitution(safeMemoryDir);
     
     // Initialize git if not already initialized
     if (this.config.autoCommit) {
