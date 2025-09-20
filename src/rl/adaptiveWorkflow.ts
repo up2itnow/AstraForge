@@ -47,6 +47,7 @@ export class AdaptiveWorkflowRL {
     if (this.deterministicMode) {
       // Prevent stochastic exploration from causing flaky tests in CI
       this.explorationRate = 0;
+      this.minExplorationRate = 0;
     }
     this.loadQTable();
   }
@@ -136,10 +137,14 @@ export class AdaptiveWorkflowRL {
     entry.visits++;
 
     // Decay exploration rate
-    this.explorationRate = Math.max(
-      this.minExplorationRate,
-      this.explorationRate * this.explorationDecay
-    );
+    if (this.deterministicMode) {
+      this.explorationRate = 0;
+    } else {
+      this.explorationRate = Math.max(
+        this.minExplorationRate,
+        this.explorationRate * this.explorationDecay
+      );
+    }
 
     console.log(
       `RL: Updated Q(${stateKey}, ${actionKey}) from ${oldQValue.toFixed(3)} to ${newQValue.toFixed(3)} (reward: ${reward.toFixed(3)})`

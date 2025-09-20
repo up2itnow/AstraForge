@@ -223,6 +223,14 @@ describe('AdaptiveWorkflowRL', () => {
       expect(updatedStats.totalActions).toBe(1);
     });
 
+    it('should keep exploration disabled in deterministic mode during updates', () => {
+      expect(rl.getStats().explorationRate).toBe(0);
+
+      rl.updateQValue(state1, action, 1.0, state2);
+
+      expect(rl.getStats().explorationRate).toBe(0);
+    });
+
     it('should increase Q-value for positive rewards', () => {
       rl.updateQValue(state1, action, 1.0, state2);
 
