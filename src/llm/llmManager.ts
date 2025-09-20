@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { LLMConfig, LLMProvider, LLMResponse, VoteResult, ConferenceResult } from './interfaces';
+import { LLMConfig, LLMProvider, LLMResponse } from './interfaces';
 import { createProvider } from './providers';
 import { LLMCache } from './cache';
 
@@ -70,7 +70,7 @@ export class LLMManager {
         throw new Error(`Provider ${config.provider} not initialized`);
       }
 
-      const response = await provider.query(prompt, config);
+      const response: LLMResponse = await provider.query(prompt, config);
 
       // Cache the response
       this.cache.set(prompt, config.provider, config.model, response.content, response.usage);

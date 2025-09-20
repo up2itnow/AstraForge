@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { ApiTesterCore, TestResult, BatchTestResult, VectorTestResult } from './apiTesterCore.js';
+import { ApiTesterCore } from './apiTesterCore.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { validateAndSanitizePath, createSafePath } from '../utils/inputValidation.js';

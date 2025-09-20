@@ -160,7 +160,7 @@ export class SpecGenerator {
     }
   }
 
-  private async generateSpecSections(parsedIdea: any, request: SpecificationRequest): Promise<any> {
+  private async generateSpecSections(parsedIdea: any, _request: SpecificationRequest): Promise<any> {
     // Use multi-LLM collaboration for better spec generation
     const llmProviders = ['openai', 'anthropic', 'openrouter'];
     const sections: any = {};

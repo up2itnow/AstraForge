@@ -342,7 +342,7 @@ export class SpecKitManager {
   private generateWorkflowId(): string {
     const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
     const counter = String(this.workflows.size + 1).padStart(3, '0');
-    return `${counter}`;
+    return `${timestamp}-${counter}`;
   }
 
   private async createDirectoryStructure(dirs: string[]): Promise<void> {

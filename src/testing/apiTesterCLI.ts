@@ -3,7 +3,6 @@
 import { Command } from 'commander';
 import axios from 'axios';
 import * as fs from 'fs';
-import * as path from 'path';
 
 interface TestResult {
   success: boolean;
