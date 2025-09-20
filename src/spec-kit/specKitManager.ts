@@ -353,22 +353,13 @@ export class SpecKitManager {
 
   private async copySpecKitTemplates(templatesDir: string): Promise<void> {
     const sourceTemplatesDir = path.join(__dirname, '../../temp_spec_kit/templates');
-    
+
     try {
-      const templates = await fs.promises.readdir(sourceTemplatesDir, { recursive: true });
-      
-      for (const template of templates) {
-        if (typeof template === 'string' && template.endsWith('.md')) {
-          const sourcePath = path.join(sourceTemplatesDir, template);
-          const destPath = path.join(templatesDir, template);
-          
-          // Ensure destination directory exists
-          await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
-          
-          const content = await fs.promises.readFile(sourcePath, 'utf8');
-          await fs.promises.writeFile(destPath, content, 'utf8');
-        }
-      }
+      await this.copyDirectorySafely(
+        sourceTemplatesDir,
+        templatesDir,
+        (relativePath, entry) => entry.isFile() && relativePath.endsWith('.md')
+      );
     } catch (error) {
       console.error('Error copying templates:', error);
       // Create basic templates if copy fails
@@ -404,19 +395,13 @@ export class SpecKitManager {
 
   private async copySpecKitScripts(scriptsDir: string): Promise<void> {
     const sourceScriptsDir = path.join(__dirname, '../../temp_spec_kit/scripts/powershell');
-    
+
     try {
-      const scripts = await fs.promises.readdir(sourceScriptsDir);
-      
-      for (const script of scripts) {
-        if (script.endsWith('.ps1')) {
-          const sourcePath = path.join(sourceScriptsDir, script);
-          const destPath = path.join(scriptsDir, script);
-          
-          const content = await fs.promises.readFile(sourcePath, 'utf8');
-          await fs.promises.writeFile(destPath, content, 'utf8');
-        }
-      }
+      await this.copyDirectorySafely(
+        sourceScriptsDir,
+        scriptsDir,
+        (relativePath, entry) => entry.isFile() && relativePath.endsWith('.ps1')
+      );
     } catch (error) {
       console.error('Error copying scripts:', error);
     }
@@ -657,5 +642,58 @@ All code reviews verify constitutional compliance.
     } catch (error) {
       console.error('Error cleaning up temp files:', error);
     }
+  }
+
+  private async copyDirectorySafely(
+    sourceDir: string,
+    destinationDir: string,
+    fileFilter?: (relativePath: string, entry: fs.Dirent) => boolean
+  ): Promise<void> {
+    const resolvedSource = path.resolve(sourceDir);
+    const resolvedDestination = path.resolve(destinationDir);
+
+    await fs.promises.mkdir(resolvedDestination, { recursive: true });
+
+    const processDirectory = async (currentSource: string, relativeBase: string): Promise<void> => {
+      const entries = await fs.promises.readdir(currentSource, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const relativePath = relativeBase ? path.join(relativeBase, entry.name) : entry.name;
+        const sourcePath = path.resolve(currentSource, entry.name);
+
+        if (!sourcePath.startsWith(resolvedSource + path.sep) && sourcePath !== resolvedSource) {
+          logger.warn(`Skipping path outside source directory: ${sourcePath}`);
+          continue;
+        }
+
+        if (entry.isSymbolicLink()) {
+          logger.warn(`Skipping symbolic link while copying Spec Kit assets: ${sourcePath}`);
+          continue;
+        }
+
+        const validation = validateAndSanitizePath(relativePath);
+        if (!validation.isValid || !validation.sanitizedPath) {
+          logger.warn(`Skipping invalid path while copying Spec Kit assets: ${relativePath}`);
+          continue;
+        }
+
+        const safeDestinationPath = createSafePath(resolvedDestination, validation.sanitizedPath);
+        if (!safeDestinationPath) {
+          logger.warn(`Unable to create safe destination path for: ${relativePath}`);
+          continue;
+        }
+
+        if (entry.isDirectory()) {
+          await fs.promises.mkdir(safeDestinationPath, { recursive: true });
+          await processDirectory(sourcePath, validation.sanitizedPath);
+        } else if (!fileFilter || fileFilter(validation.sanitizedPath, entry)) {
+          const destinationDirname = path.dirname(safeDestinationPath);
+          await fs.promises.mkdir(destinationDirname, { recursive: true });
+          await fs.promises.copyFile(sourcePath, safeDestinationPath);
+        }
+      }
+    };
+
+    await processDirectory(resolvedSource, '');
   }
 }
