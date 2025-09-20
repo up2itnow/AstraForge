@@ -99,7 +99,7 @@ export class SpecKitManager {
       templatesDir,
       scriptsDir,
       memoryDir,
-    ] as [string, string, string, string];
+    ];
 
     // Create directory structure
     await this.createDirectoryStructure([
