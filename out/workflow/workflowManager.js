@@ -9,9 +9,11 @@
  * @version 1.0.0
  */
 import * as vscode from 'vscode';
+import { AgentEconomy } from '../llm/agentEconomy';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
 import * as path from 'path';
+import { PhaseEvaluator } from '../testing/phaseEvaluator';
 /**
  * Main workflow orchestrator that manages the complete development lifecycle
  *
@@ -32,7 +34,7 @@ export class WorkflowManager {
      * @param vectorDB - Vector database for context storage and retrieval
      * @param gitManager - Git integration for version control
      */
-    constructor(llmManager, vectorDB, gitManager) {
+    constructor(llmManager, vectorDB, gitManager, phaseEvaluator) {
         this.llmManager = llmManager;
         this.vectorDB = vectorDB;
         this.gitManager = gitManager;
@@ -44,7 +46,11 @@ export class WorkflowManager {
         this.projectIdea = '';
         /** Generated project plan */
         this.buildPlan = '';
+        /** Tracks whether the vector database has been initialized */
+        this.vectorInitialized = false;
         this.workflowRL = new AdaptiveWorkflowRL();
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        this.phaseEvaluator = phaseEvaluator ?? new PhaseEvaluator(workspaceRoot);
         this.workspaceId = `workspace_${Date.now()}`;
         this.metrics = {
             startTime: Date.now(),
@@ -53,7 +59,85 @@ export class WorkflowManager {
             userFeedback: [],
             iterations: 0,
         };
+        this.agentEconomy = new AgentEconomy(this.llmManager);
         this.initializeCollaboration();
+    }
+    /**
+     * Ensure the vector database is initialized before use
+     */
+    async ensureVectorReady() {
+        if (this.vectorInitialized) {
+            return;
+        }
+        if (!this.vectorInitPromise) {
+            this.vectorInitPromise = (async () => {
+                try {
+                    await this.vectorDB.init();
+                    this.vectorInitialized = true;
+                }
+                catch (error) {
+                    console.error('Vector DB initialization failed:', error);
+                    throw error;
+                }
+            })();
+        }
+        try {
+            await this.vectorInitPromise;
+        }
+        catch (error) {
+            // Allow retries on subsequent calls if initialization failed
+            this.vectorInitialized = false;
+            // Do not reset vectorInitPromise to undefined to prevent race conditions
+            throw error;
+        }
+    }
+    refreshRoutingPlan(context, priority, costBudget) {
+        const plan = this.agentEconomy.createRoutingPlan({
+            requestId: `${this.workspaceId}-${context}-${Date.now()}`,
+            prompt: this.projectIdea || context,
+            priority,
+            costBudget,
+            contextType: 'workflow',
+            metadata: { context }
+        });
+        this.workflowRoutingPlan = plan;
+        return plan;
+    }
+    ensureRoutingPlan(context = 'default', priority = 'medium') {
+        if (!this.workflowRoutingPlan || this.workflowRoutingPlan.allocations.length === 0) {
+            return this.refreshRoutingPlan(context, priority);
+        }
+        return this.workflowRoutingPlan;
+    }
+    getActiveProviderNames() {
+        const plan = this.ensureRoutingPlan();
+        if (!plan.allocations.length) {
+            return this.llmManager.getPanelConfigurations().map(config => config.provider);
+        }
+        return plan.allocations.map(allocation => allocation.provider);
+    }
+    getPrimaryAllocation() {
+        const plan = this.ensureRoutingPlan();
+        if (!plan.allocations.length) {
+            throw new Error('Agent economy returned no routing allocations');
+        }
+        return plan.allocations[0];
+    }
+    createWorkflowRequestId(label) {
+        return `${this.workspaceId}:${label}:${Date.now()}`;
+    }
+    mapPhasePriority(phase) {
+        switch (phase) {
+            case 'Deployment':
+                return 'high';
+            case 'Testing':
+                return 'high';
+            case 'Prototyping':
+                return 'medium';
+            case 'Planning':
+            default:
+                return 'medium';
+        }
     }
     /**
      * Start a new development workflow from a project idea
@@ -73,26 +157,27 @@ export class WorkflowManager {
         this.projectIdea = idea;
         this.currentPhase = 0;
         try {
+            this.refreshRoutingPlan('initial-planning', option === 'letPanelDecide' ? 'high' : 'medium');
+            const providerNames = this.getActiveProviderNames();
             let prompt = idea;
             if (option === 'letPanelDecide') {
-                prompt = await this.llmManager.conference(`Refine this project idea: ${idea}`);
+                prompt = await this.llmManager.conference(`Refine this project idea: ${idea}`, providerNames, this.createWorkflowRequestId('refine-idea'));
             }
             // Step 2: Conferencing
-            const discussion = await this.llmManager.conference(`Discuss project: ${prompt}. Propose tech stack, estimates, plan.`);
-            this.buildPlan = await this.llmManager.voteOnDecision(discussion, [
-                'Approve Plan',
-                'Need Questions',
-            ]);
+            const discussion = await this.llmManager.conference(`Discuss project: ${prompt}. Propose tech stack, estimates, plan.`, providerNames, this.createWorkflowRequestId('initial-conference'));
+            this.buildPlan = await this.llmManager.voteOnDecision(discussion, ['Approve Plan', 'Need Questions'], providerNames, this.createWorkflowRequestId('plan-vote'));
             if (this.buildPlan === 'Need Questions') {
-                const questions = await this.llmManager.queryLLM(0, `Generate 5-10 questions for clarification on ${prompt}`);
+                const primaryAllocation = this.getPrimaryAllocation();
+                const questions = await this.llmManager.queryByProvider(primaryAllocation.provider, `Generate 5-10 questions for clarification on ${prompt}`, primaryAllocation.model, this.createWorkflowRequestId('clarification-questions'));
                 const answers = await vscode.window.showInputBox({
                     prompt: `Please answer these questions: ${questions}`,
                 });
                 if (answers) {
-                    this.buildPlan = await this.llmManager.conference(`Incorporate answers: ${answers}. Finalize plan.`);
+                    this.buildPlan = await this.llmManager.conference(`Incorporate answers: ${answers}. Finalize plan.`, providerNames, this.createWorkflowRequestId('incorporate-answers'));
                 }
             }
             // Store in vector DB
+            await this.ensureVectorReady();
             const embedding = await this.vectorDB.getEmbedding(this.buildPlan);
             await this.vectorDB.addEmbedding('buildPlan', embedding, { plan: this.buildPlan });
             vscode.window.showInformationMessage('Build Plan ready! Proceeding to phases.');
@@ -106,6 +191,8 @@ export class WorkflowManager {
         const phase = this.phases[this.currentPhase];
         this.metrics.phaseStartTime = Date.now();
         try {
+            this.refreshRoutingPlan(`phase-${phase.toLowerCase()}`, this.mapPhasePriority(phase));
+            const providerNames = this.getActiveProviderNames();
             // Get current workflow state for RL
             const currentState = this.getCurrentWorkflowState();
             // Get RL recommendation for next action
@@ -125,6 +212,7 @@ export class WorkflowManager {
             });
             // Enhanced context retrieval using vector DB
             const contextQuery = `${phase} for ${this.projectIdea}`;
+            await this.ensureVectorReady();
             const contextEmbedding = await this.vectorDB.getEmbedding(contextQuery);
             const relevantContext = await this.vectorDB.queryEmbedding(contextEmbedding, 3);
             const contextText = relevantContext
@@ -134,7 +222,7 @@ export class WorkflowManager {
                 .join('\n');
             // Generate phase content with enhanced prompting
             const phasePrompt = this.buildEnhancedPrompt(phase, contextText);
-            const output = await this.llmManager.conference(phasePrompt);
+            const output = await this.llmManager.conference(phasePrompt, providerNames, this.createWorkflowRequestId(`phase-${phase}-execution`));
             // Process and validate output
             const processedOutput = await this.processPhaseOutput(output, phase);
             // Write output to file with better organization
@@ -148,10 +236,15 @@ export class WorkflowManager {
             // User interaction with better UX
             const userDecision = await this.getUserDecision(suggestions, review);
             const userFeedback = await this.processUserDecision(userDecision, suggestions, processedOutput, phase);
+            const evaluationTelemetry = await this.triggerPostPhaseEvaluation({
+                phase,
+                decision: userDecision,
+                feedback: userFeedback,
+            });
             // Update RL with feedback
             const newState = this.getCurrentWorkflowState();
             const reward = this.workflowRL.calculateReward(currentState, recommendedAction, newState, true, // Phase succeeded
-            userFeedback);
+            userFeedback, evaluationTelemetry);
             this.workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
             // Store phase results in vector DB for future context
             await this.storePhaseContext(phase, processedOutput, review);
@@ -172,6 +265,37 @@ export class WorkflowManager {
         if (this.currentPhase < this.phases.length) {
             this.executePhase();
         }
+    }
+    getActivePhase() {
+        if (this.currentPhase < this.phases.length) {
+            return this.phases[this.currentPhase];
+        }
+        return this.phases[this.phases.length - 1];
+    }
+    ingestSpecDeviations(report) {
+        if (!report.deviations || report.deviations.length === 0) {
+            return;
+        }
+        const currentState = this.getCurrentWorkflowState();
+        const penalty = report.deviations.reduce((sum, deviation) => {
+            return sum + this.calculateDeviationPenalty(deviation.severity);
+        }, 0);
+        const correctiveAction = {
+            type: 'optimize',
+            confidence: Math.min(1, Math.abs(penalty)),
+        };
+        const nextState = {
+            ...currentState,
+            errorRate: Math.min(1, currentState.errorRate + report.deviations.length * 0.05),
+        };
+        this.workflowRL.updateQValue(currentState, correctiveAction, penalty, nextState);
+        this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'spec_sync_deviation', {
+            workflowId: report.workflowId,
+            featureName: report.featureName,
+            deviations: report.deviations,
+            progress: report.progress,
+            timestamp: Date.now(),
+        });
     }
     // Supporting methods for enhanced workflow
     async initializeCollaboration() {
@@ -233,6 +357,16 @@ export class WorkflowManager {
                 return { shouldReturn: false };
         }
     }
+    calculateDeviationPenalty(severity) {
+        switch (severity) {
+            case 'critical':
+                return -0.7;
+            case 'warning':
+                return -0.3;
+            default:
+                return -0.1;
+        }
+    }
     buildEnhancedPrompt(phase, contextText) {
         const basePrompt = `Execute ${phase} for project: ${this.projectIdea}. Plan: ${this.buildPlan}`;
         if (contextText) {
@@ -278,11 +412,12 @@ export class WorkflowManager {
     }
     async conductPhaseReview(output, phase) {
         const reviewPrompt = `Review this ${phase} phase output for quality, completeness, and potential issues:\n\n${output}`;
-        return await this.llmManager.conference(reviewPrompt);
+        return await this.llmManager.conference(reviewPrompt, this.getActiveProviderNames(), this.createWorkflowRequestId(`review-${phase}`));
     }
     async generateIntelligentSuggestions(phase, output, contextText) {
         const suggestionPrompt = `Based on the ${phase} output and context, suggest 3-5 specific improvements or innovations:\n\nOutput:\n${output}\n\nContext:\n${contextText}`;
-        return await this.llmManager.queryLLM(0, suggestionPrompt);
+        const primary = this.getPrimaryAllocation();
+        return await this.llmManager.queryByProvider(primary.provider, suggestionPrompt, primary.model, this.createWorkflowRequestId(`suggestions-${phase}`));
     }
     async getUserDecision(suggestions, review) {
         const options = [
@@ -305,7 +440,7 @@ export class WorkflowManager {
                 break;
             case 'Apply suggestions': {
                 feedback = 0.9;
-                const improvedOutput = await this.llmManager.conference(`Apply these suggestions: ${suggestions} to improve: ${output}`);
+                const improvedOutput = await this.llmManager.conference(`Apply these suggestions: ${suggestions} to improve: ${output}`, this.getActiveProviderNames(), this.createWorkflowRequestId(`apply-suggestions-${phase}`));
                 await this.writePhaseOutput(improvedOutput, `${phase}_improved`);
                 break;
             }
@@ -315,20 +450,46 @@ export class WorkflowManager {
                     prompt: 'What modifications would you like?',
                 });
                 if (modification) {
-                    const modifiedOutput = await this.llmManager.conference(`Apply these modifications: ${modification} to: ${output}`);
+                    const modifiedOutput = await this.llmManager.conference(`Apply these modifications: ${modification} to: ${output}`, this.getActiveProviderNames(), this.createWorkflowRequestId(`apply-modifications-${phase}`));
                     await this.writePhaseOutput(modifiedOutput, `${phase}_modified`);
                 }
                 break;
             }
             case 'Get more details': {
                 feedback = 0.6;
-                const details = await this.llmManager.queryLLM(0, `Provide more detailed explanation for: ${output}`);
+                const primary = this.getPrimaryAllocation();
+                const details = await this.llmManager.queryByProvider(primary.provider, `Provide more detailed explanation for: ${output}`, primary.model, this.createWorkflowRequestId(`details-${phase}`));
                 vscode.window.showInformationMessage(`Details: ${details.substring(0, 200)}...`);
                 break;
             }
         }
         this.metrics.userFeedback.push(feedback);
         return feedback;
+    }
+    async triggerPostPhaseEvaluation(params) {
+        if (!this.phaseEvaluator) {
+            return undefined;
+        }
+        try {
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const telemetry = await this.phaseEvaluator.evaluatePhase({
+                phase: params.phase,
+                humanDecision: params.decision,
+                humanFeedback: params.feedback,
+                iteration: this.metrics.iterations + 1,
+                workspaceRoot,
+            });
+            const summarized = this.phaseEvaluator.summarizeTelemetry(telemetry);
+            this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'phase_evaluated', {
+                phase: params.phase,
+                telemetry: summarized,
+            });
+            return telemetry;
+        }
+        catch (error) {
+            console.warn('Post-phase evaluation failed:', error);
+            return undefined;
+        }
     }
     async storePhaseContext(phase, output, review) {
         const contextData = {
@@ -367,11 +528,13 @@ export class WorkflowManager {
     }
     async completeProject() {
         try {
+            this.refreshRoutingPlan('project-completion', 'high');
+            const primary = this.getPrimaryAllocation();
             // Generate comprehensive final report with metrics
             const totalTime = Date.now() - this.metrics.startTime;
             const rlStats = this.workflowRL.getStats();
-            const report = await this.llmManager.queryLLM(0, `Generate a comprehensive final report for ${this.projectIdea}. Include project summary, key achievements, and lessons learned.`);
-            const bonuses = await this.llmManager.queryLLM(0, `Suggest 5 innovative A+ enhancements for ${this.projectIdea}, considering cutting-edge technologies like AI, blockchain, and real-time collaboration.`);
+            const report = await this.llmManager.queryByProvider(primary.provider, `Generate a comprehensive final report for ${this.projectIdea}. Include project summary, key achievements, and lessons learned.`, primary.model, this.createWorkflowRequestId('final-report'));
+            const bonuses = await this.llmManager.queryByProvider(primary.provider, `Suggest 5 innovative A+ enhancements for ${this.projectIdea}, considering cutting-edge technologies like AI, blockchain, and real-time collaboration.`, primary.model, this.createWorkflowRequestId('final-enhancements'));
             const finalReport = `# AstraForge Project Completion Report
 
 ## Project: ${this.projectIdea}
