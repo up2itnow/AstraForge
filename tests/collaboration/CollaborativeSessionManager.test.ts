@@ -4,7 +4,7 @@
 
 import { CollaborativeSessionManager } from '../../src/collaboration/CollaborativeSessionManager';
 import { LLMManager } from '../../src/llm/llmManager';
-import { VectorDB } from '../../src/db/vectorDB';
+import { MemoryOrchestrator } from '../../src/db/memoryOrchestrator';
 import { CollaborationRequest } from '../../src/collaboration/types/collaborationTypes';
 import * as vscode from 'vscode';
 import * as dotenv from 'dotenv';
@@ -36,7 +36,7 @@ jest.mock('vscode', () => ({
 describe('CollaborativeSessionManager Integration', () => {
   let sessionManager: CollaborativeSessionManager;
   let llmManager: LLMManager;
-  let vectorDB: VectorDB;
+  let memoryOrchestrator: MemoryOrchestrator;
 
   const testStoragePath = './test_collaboration_vectors';
 
@@ -48,16 +48,16 @@ describe('CollaborativeSessionManager Integration', () => {
 
     // Create real instances for integration testing
     llmManager = new LLMManager();
-    vectorDB = new VectorDB(testStoragePath);
-    await vectorDB.init();
+    memoryOrchestrator = new MemoryOrchestrator(testStoragePath);
+    await memoryOrchestrator.init();
 
     // Create session manager in test mode for controlled testing
-    sessionManager = new CollaborativeSessionManager(llmManager, vectorDB, true);
+    sessionManager = new CollaborativeSessionManager(llmManager, memoryOrchestrator, true);
   });
 
   afterEach(async () => {
-    if (vectorDB) {
-      vectorDB.close();
+    if (memoryOrchestrator) {
+      await memoryOrchestrator.close();
     }
     
     // Clean up test data
@@ -254,7 +254,7 @@ describe('CollaborativeSessionManager Integration', () => {
       process.env.OPENROUTER_API_KEY = 'invalid-key';
       
       const invalidLLMManager = new LLMManager();
-      const invalidSessionManager = new CollaborativeSessionManager(invalidLLMManager, vectorDB, true);
+      const invalidSessionManager = new CollaborativeSessionManager(invalidLLMManager, memoryOrchestrator, true);
       
       const request: CollaborationRequest = {
         prompt: 'This should fail with invalid API key',
@@ -310,15 +310,15 @@ describe('CollaborativeSessionManager Integration', () => {
       
       // Verify data was stored (basic check)
       expect(result).toBeDefined();
-      expect(vectorDB).toBeDefined();
+      expect(memoryOrchestrator).toBeDefined();
     });
 
     it('should handle vector DB storage errors gracefully', async () => {
       // Create session manager with invalid vector DB path
-      const invalidVectorDB = new VectorDB('/invalid/path');
-      await invalidVectorDB.init(); // This should not throw
+      const invalidMemory = new MemoryOrchestrator('/invalid/path');
+      await invalidMemory.init(); // This should not throw
 
-      const invalidSessionManager = new CollaborativeSessionManager(llmManager, invalidVectorDB, true);
+      const invalidSessionManager = new CollaborativeSessionManager(llmManager, invalidMemory, true);
       
       const request: CollaborationRequest = {
         prompt: 'Test with invalid vector DB',
@@ -329,8 +329,8 @@ describe('CollaborativeSessionManager Integration', () => {
 
       // Should not throw even with invalid vector DB
       await expect(invalidSessionManager.startSession(request)).resolves.toBeDefined();
-      
-      invalidVectorDB.close();
+
+      await invalidMemory.close();
     });
   });
 

@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import { LLMManager } from '../../src/llm/llmManager';
-import { VectorDB } from '../../src/db/vectorDB';
+import { MemoryOrchestrator } from '../../src/db/memoryOrchestrator';
 import { WorkflowManager } from '../../src/workflow/workflowManager';
 import { GitManager } from '../../src/git/gitManager';
 
@@ -46,7 +46,7 @@ jest.mock('child_process');
 
 describe('AstraForge Extension Integration', () => {
   let llmManager: LLMManager;
-  let vectorDB: VectorDB;
+  let memoryOrchestrator: MemoryOrchestrator;
   let gitManager: GitManager;
   let workflowManager: WorkflowManager;
 
@@ -55,12 +55,12 @@ describe('AstraForge Extension Integration', () => {
 
     // Initialize components in integration order
     llmManager = new LLMManager();
-    vectorDB = new VectorDB('/test/integration');
+    memoryOrchestrator = new MemoryOrchestrator('/test/integration');
     gitManager = new GitManager();
-    workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
+    workflowManager = new WorkflowManager(llmManager, memoryOrchestrator, gitManager);
 
     // Initialize vector DB
-    await vectorDB.init();
+    await memoryOrchestrator.init();
   });
 
   afterEach(async () => {
@@ -68,6 +68,9 @@ describe('AstraForge Extension Integration', () => {
     try {
       if (workflowManager && (workflowManager as any).collaborationServer) {
         await (workflowManager as any).collaborationServer.stop();
+      }
+      if (memoryOrchestrator) {
+        await memoryOrchestrator.close();
       }
     } catch (error) {
       // Ignore cleanup errors
@@ -148,7 +151,7 @@ describe('AstraForge Extension Integration', () => {
     it('should integrate LLM manager with vector DB for context-aware responses', async () => {
       // Add some context to vector DB
       const contextEmbedding = [0.1, 0.2, 0.3, 0.4];
-      await vectorDB.addEmbedding('context1', contextEmbedding, {
+      await memoryOrchestrator.addEmbedding('context1', contextEmbedding, {
         type: 'previous_project',
         content: 'Previous calculator implementation',
       });
@@ -158,8 +161,8 @@ describe('AstraForge Extension Integration', () => {
       mockHf.prototype.featureExtraction = jest.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4]); // Similar to stored context
 
       // Query with similar context
-      const queryEmbedding = await vectorDB.getEmbedding('calculator implementation');
-      const results = await vectorDB.queryEmbedding(queryEmbedding, 1);
+      const queryEmbedding = await memoryOrchestrator.getEmbedding('calculator implementation');
+      const results = await memoryOrchestrator.queryEmbedding(queryEmbedding, 1);
 
       expect(results).toHaveLength(1);
       expect(results[0].similarity).toBeGreaterThan(0.8);
@@ -207,7 +210,7 @@ describe('AstraForge Extension Integration', () => {
         .fn()
         .mockRejectedValue(new Error('Embedding API Error'));
 
-      const embedding = await vectorDB.getEmbedding('test text');
+      const embedding = await memoryOrchestrator.getEmbedding('test text');
 
       expect(embedding).toHaveLength(384); // Fallback embedding size
       expect(Array.isArray(embedding)).toBe(true);
@@ -256,7 +259,7 @@ describe('AstraForge Extension Integration', () => {
       const texts = ['text1', 'text2', 'text3', 'text4', 'text5'];
       const startTime = Date.now();
 
-      const embeddings = await vectorDB.getBatchEmbeddings(texts);
+      const embeddings = await memoryOrchestrator.getBatchEmbeddings(texts);
 
       const endTime = Date.now();
       const duration = endTime - startTime;
@@ -269,17 +272,19 @@ describe('AstraForge Extension Integration', () => {
   describe('Data Persistence Integration', () => {
     it('should persist vector DB data across sessions', async () => {
       // Add data to vector DB
-      await vectorDB.addEmbedding('test1', [1, 2, 3], { content: 'test data' });
-      await vectorDB.save();
+      await memoryOrchestrator.addEmbedding('test1', [1, 2, 3], { content: 'test data' });
+      await memoryOrchestrator.close();
 
       // Create new instance (simulating restart)
-      const newVectorDB = new VectorDB('/test/integration');
-      await newVectorDB.init();
+      const newMemory = new MemoryOrchestrator('/test/integration');
+      await newMemory.init();
 
       // Should be able to query previously stored data
-      const results = await newVectorDB.queryEmbedding([1, 2, 3], 1);
+      const results = await newMemory.queryEmbedding([1, 2, 3], 1);
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe('test1');
+
+      await newMemory.close();
     });
 
     it('should persist RL learning across sessions', async () => {

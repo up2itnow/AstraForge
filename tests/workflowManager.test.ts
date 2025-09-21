@@ -4,13 +4,13 @@
 
 import { WorkflowManager } from '../src/workflow/workflowManager';
 import { LLMManager } from '../src/llm/llmManager';
-import { VectorDB } from '../src/db/vectorDB';
+import { MemoryOrchestrator } from '../src/db/memoryOrchestrator';
 import { GitManager } from '../src/git/gitManager';
 import * as vscode from 'vscode';
 
 // Mock all dependencies
 jest.mock('../src/llm/llmManager');
-jest.mock('../src/db/vectorDB');
+jest.mock('../src/db/memoryOrchestrator');
 jest.mock('../src/git/gitManager');
 jest.mock('../src/rl/adaptiveWorkflow');
 jest.mock('../src/server/collaborationServer');
@@ -39,13 +39,13 @@ jest.mock('vscode', () => ({
 }));
 
 const mockLLMManager = LLMManager as jest.MockedClass<typeof LLMManager>;
-const mockVectorDB = VectorDB as jest.MockedClass<typeof VectorDB>;
+const mockMemoryOrchestrator = MemoryOrchestrator as jest.MockedClass<typeof MemoryOrchestrator>;
 const mockGitManager = GitManager as jest.MockedClass<typeof GitManager>;
 
 describe('WorkflowManager', () => {
   let workflowManager: WorkflowManager;
   let mockLLM: jest.Mocked<LLMManager>;
-  let mockVector: jest.Mocked<VectorDB>;
+  let mockMemory: jest.Mocked<MemoryOrchestrator>;
   let mockGit: jest.Mocked<GitManager>;
 
   beforeEach(() => {
@@ -58,11 +58,16 @@ describe('WorkflowManager', () => {
       voteOnDecision: jest.fn(),
     } as any;
 
-    mockVector = {
+    mockMemory = {
       init: jest.fn().mockResolvedValue(undefined),
       getEmbedding: jest.fn(),
       queryEmbedding: jest.fn(),
       addEmbedding: jest.fn(),
+      getTemporalSlice: jest.fn(),
+      traceLineage: jest.fn(),
+      listMemories: jest.fn(),
+      getMemory: jest.fn(),
+      registerRelationship: jest.fn(),
     } as any;
 
     mockGit = {
@@ -70,10 +75,10 @@ describe('WorkflowManager', () => {
     } as any;
 
     mockLLMManager.mockImplementation(() => mockLLM);
-    mockVectorDB.mockImplementation(() => mockVector);
+    mockMemoryOrchestrator.mockImplementation(() => mockMemory);
     mockGitManager.mockImplementation(() => mockGit);
 
-    workflowManager = new WorkflowManager(mockLLM, mockVector, mockGit);
+    workflowManager = new WorkflowManager(mockLLM, mockMemory, mockGit);
   });
 
   describe('Initialization', () => {
@@ -87,14 +92,14 @@ describe('WorkflowManager', () => {
     });
 
     it('initializes the vector database on first workflow start', async () => {
-      mockVector.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
-      mockVector.queryEmbedding.mockResolvedValue([]);
+      mockMemory.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
+      mockMemory.queryEmbedding.mockResolvedValue([]);
       mockGit.commit.mockResolvedValue(undefined);
 
       await workflowManager.startWorkflow('Initialize vector DB');
 
-      expect(mockVector.init).toHaveBeenCalledTimes(1);
-      expect(mockVector.getEmbedding).toHaveBeenCalled();
+      expect(mockMemory.init).toHaveBeenCalledTimes(1);
+      expect(mockMemory.getEmbedding).toHaveBeenCalled();
     });
   });
 
@@ -103,8 +108,8 @@ describe('WorkflowManager', () => {
       // Setup common mocks
       mockLLM.conference.mockResolvedValue('LLM conference response');
       mockLLM.queryLLM.mockResolvedValue('LLM query response');
-      mockVector.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
-      mockVector.queryEmbedding.mockResolvedValue([]);
+      mockMemory.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
+      mockMemory.queryEmbedding.mockResolvedValue([]);
       mockGit.commit.mockResolvedValue(undefined);
     });
 
@@ -114,7 +119,7 @@ describe('WorkflowManager', () => {
       await workflowManager.startWorkflow(testIdea);
 
       expect(mockLLM.conference).toHaveBeenCalled();
-      expect(mockVector.addEmbedding).toHaveBeenCalled();
+      expect(mockMemory.addEmbedding).toHaveBeenCalled();
     });
 
     it('should handle "letPanelDecide" option', async () => {
@@ -138,7 +143,7 @@ describe('WorkflowManager', () => {
       await workflowManager.startWorkflow(testIdea);
       workflowManager.proceedToNextPhase();
 
-      expect(mockVector.getEmbedding).toHaveBeenCalled();
+      expect(mockMemory.getEmbedding).toHaveBeenCalled();
       expect(mockLLM.conference).toHaveBeenCalled();
       expect(mockGit.commit).toHaveBeenCalled();
     });
@@ -146,9 +151,18 @@ describe('WorkflowManager', () => {
 
   describe('Phase Execution', () => {
     beforeEach(() => {
-      mockVector.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
-      mockVector.queryEmbedding.mockResolvedValue([
-        { id: 'test1', vector: [1, 2, 3, 4], similarity: 0.9, metadata: { plan: 'Previous plan data' } },
+      mockMemory.getEmbedding.mockResolvedValue([1, 2, 3, 4]);
+      mockMemory.queryEmbedding.mockResolvedValue([
+        {
+          id: 'test1',
+          vector: [1, 2, 3, 4],
+          similarity: 0.9,
+          metadata: { plan: 'Previous plan data', timestamp: new Date().toISOString() },
+          timestamp: Date.now(),
+          tier: 'hot',
+          partition: '2024-01-01',
+          neighbors: [],
+        },
       ]);
       mockLLM.conference.mockResolvedValue('Phase execution result');
       mockLLM.queryLLM.mockResolvedValue('Review result');
@@ -158,10 +172,10 @@ describe('WorkflowManager', () => {
     it('should retrieve relevant context from vector DB', async () => {
       await workflowManager.startWorkflow('Test project');
 
-      expect(mockVector.getEmbedding).toHaveBeenCalledWith(
+      expect(mockMemory.getEmbedding).toHaveBeenCalledWith(
         expect.stringContaining('Planning for Test project')
       );
-      expect(mockVector.queryEmbedding).toHaveBeenCalled();
+      expect(mockMemory.queryEmbedding).toHaveBeenCalled();
     });
 
     it('should generate enhanced prompts with context', async () => {
@@ -193,7 +207,7 @@ describe('WorkflowManager', () => {
     it('should store phase context in vector DB', async () => {
       await workflowManager.startWorkflow('Test project');
 
-      expect(mockVector.addEmbedding).toHaveBeenCalledWith(
+      expect(mockMemory.addEmbedding).toHaveBeenCalledWith(
         expect.stringContaining('phase_'),
         expect.any(Array),
         expect.objectContaining({
@@ -208,8 +222,8 @@ describe('WorkflowManager', () => {
     beforeEach(() => {
       mockLLM.conference.mockResolvedValue('Test output');
       mockLLM.queryLLM.mockResolvedValue('Test review');
-      mockVector.getEmbedding.mockResolvedValue([1, 2, 3]);
-      mockVector.queryEmbedding.mockResolvedValue([]);
+      mockMemory.getEmbedding.mockResolvedValue([1, 2, 3]);
+      mockMemory.queryEmbedding.mockResolvedValue([]);
     });
 
     it('should handle "Apply suggestions" user choice', async () => {
