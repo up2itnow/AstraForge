@@ -4,7 +4,13 @@
  */
 
 import * as vscode from 'vscode';
-import { LLMConfig, LLMProvider, LLMResponse } from './interfaces';
+import {
+  LLMConfig,
+  LLMProvider,
+  LLMRequestMetric,
+  LLMResponse,
+  ProviderMetricsSummary
+} from './interfaces';
 import { createProvider } from './providers';
 import { LLMCache } from './cache';
 
@@ -13,6 +19,9 @@ export class LLMManager {
   private providers = new Map<string, LLMProvider>();
   private cache: LLMCache;
   private readonly maxConcurrentRequests: number;
+  private readonly maxMetricsRetention = 500;
+  private readonly providerPricing: Record<LLMConfig['provider'], { prompt: number; completion: number }>;
+  private requestMetrics: LLMRequestMetric[] = [];
 
   constructor() {
     const panelConfig = vscode.workspace
@@ -28,6 +37,13 @@ export class LLMManager {
     this.maxConcurrentRequests = vscode.workspace
       .getConfiguration('astraforge')
       .get('maxConcurrentRequests', 3);
+
+    this.providerPricing = {
+      OpenAI: { prompt: 0.03, completion: 0.06 },
+      Anthropic: { prompt: 0.025, completion: 0.05 },
+      xAI: { prompt: 0.02, completion: 0.04 },
+      OpenRouter: { prompt: 0.02, completion: 0.04 }
+    };
 
     this.initializeProviders();
   }
@@ -52,10 +68,58 @@ export class LLMManager {
     }
   }
 
+  private recordMetric(
+    config: LLMConfig,
+    latencyMs: number,
+    usage: LLMResponse['usage'] | undefined,
+    success: boolean,
+    error: unknown,
+    requestId?: string
+  ): void {
+    const promptTokens = usage?.promptTokens ?? 0;
+    const completionTokens = usage?.completionTokens ?? 0;
+    const totalTokens = usage?.totalTokens ?? promptTokens + completionTokens;
+    const costUsd = success ? this.calculateCost(config.provider, promptTokens, completionTokens) : 0;
+
+    const metric: LLMRequestMetric = {
+      provider: config.provider,
+      model: config.model,
+      success,
+      timestamp: Date.now(),
+      latencyMs,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      costUsd,
+      requestId,
+      errorMessage: success ? undefined : error instanceof Error ? error.message : String(error)
+    };
+
+    this.requestMetrics.push(metric);
+    if (this.requestMetrics.length > this.maxMetricsRetention) {
+      this.requestMetrics = this.requestMetrics.slice(-this.maxMetricsRetention);
+    }
+  }
+
+  private calculateCost(
+    provider: LLMConfig['provider'],
+    promptTokens: number,
+    completionTokens: number
+  ): number {
+    const pricing = this.providerPricing[provider];
+    if (!pricing) {
+      return 0;
+    }
+
+    const promptCost = (promptTokens * pricing.prompt) / 1000;
+    const completionCost = (completionTokens * pricing.completion) / 1000;
+    return Number((promptCost + completionCost).toFixed(6));
+  }
+
   /**
    * Query a specific LLM by index with caching and error handling
    */
-  async queryLLM(index: number, prompt: string): Promise<string> {
+  async queryLLM(index: number, prompt: string, requestId?: string): Promise<string> {
     const config = this.panel[index];
     if (!config) {
       return 'No LLM configured at index ' + index;
@@ -72,6 +136,8 @@ export class LLMManager {
       return 'Rate limit exceeded. Please try again later.';
     }
 
+    const startTime = Date.now();
+
     try {
       const provider = this.providers.get(config.provider);
       if (!provider) {
@@ -79,17 +145,23 @@ export class LLMManager {
       }
 
       const response: LLMResponse = await provider.query(prompt, config);
+      const latency = Date.now() - startTime;
 
       // Cache the response
       this.cache.set(prompt, config.provider, config.model, response.content, response.usage);
 
+      this.recordMetric(config, latency, response.usage, true, undefined, requestId);
+
       return response.content;
     } catch (error: any) {
+      const latency = Date.now() - startTime;
+      this.recordMetric(config, latency, undefined, false, error, requestId);
       vscode.window.showErrorMessage(`LLM query failed: ${error.message}. Falling back...`);
 
       // Fallback to primary LLM
       if (index !== 0) {
-        return this.queryLLM(0, prompt);
+        const fallbackRequestId = requestId ? `${requestId}:fallback` : undefined;
+        return this.queryLLM(0, prompt, fallbackRequestId);
       }
 
       return `Error: ${error.message}`;
@@ -99,8 +171,15 @@ export class LLMManager {
   /**
    * Parallel voting system with improved accuracy and fuzzy matching
    */
-  async voteOnDecision(prompt: string, options: string[]): Promise<string> {
-    if (this.panel.length === 0 || options.length === 0) {
+  async voteOnDecision(
+    prompt: string,
+    options: string[],
+    providerNames?: string[],
+    requestId?: string
+  ): Promise<string> {
+    const configs = this.getConfigsByProviders(providerNames);
+
+    if (configs.length === 0 || options.length === 0) {
       return options[0] || 'No options provided';
     }
 
@@ -113,12 +192,16 @@ Please vote on ONE of these options: ${options.join(', ')}
 Respond with ONLY the option you choose, exactly as written.`;
 
     // Create voting promises with concurrency limit
-    const votePromises = this.panel.map(async (_, i) => {
+    const votePromises = configs.map(async ({ index, config }) => {
       try {
-        const response = await this.queryLLM(i, votePrompt);
-        return { response, success: true, index: i };
+        const response = await this.queryLLM(
+          index,
+          votePrompt,
+          requestId ? `${requestId}:${config.provider}` : undefined
+        );
+        return { response, success: true, index };
       } catch {
-        return { response: options[0], success: false, index: i };
+        return { response: options[0], success: false, index };
       }
     });
 
@@ -162,8 +245,13 @@ Respond with ONLY the option you choose, exactly as written.`;
   /**
    * Conference system for collaborative discussion
    */
-  async conference(prompt: string): Promise<string> {
-    if (this.panel.length === 0) {
+  async conference(
+    prompt: string,
+    providerNames?: string[],
+    requestId?: string
+  ): Promise<string> {
+    const configs = this.getConfigsByProviders(providerNames);
+    if (configs.length === 0) {
       return 'No LLMs configured for conference';
     }
 
@@ -171,10 +259,13 @@ Respond with ONLY the option you choose, exactly as written.`;
     const discussionHistory: string[] = [prompt];
 
     // Sequential discussion with each LLM
-    for (let i = 0; i < this.panel.length; i++) {
-      const config = this.panel[i];
-      const response = await this.queryLLM(i, discussion);
-      const contribution = `\nLLM ${i + 1} (${config.role} - ${config.provider}): ${response}`;
+    for (const { config, index } of configs) {
+      const response = await this.queryLLM(
+        index,
+        discussion,
+        requestId ? `${requestId}:${config.provider}` : undefined
+      );
+      const contribution = `\nLLM ${index + 1} (${config.role} - ${config.provider}): ${response}`;
       discussion += contribution;
       discussionHistory.push(contribution);
     }
@@ -230,6 +321,163 @@ Respond with ONLY the option you choose, exactly as written.`;
     }
 
     return models;
+  }
+
+  getPanelConfigurations(): LLMConfig[] {
+    return [...this.panel];
+  }
+
+  getRequestMetrics(providerName?: string): LLMRequestMetric[] {
+    if (!providerName) {
+      return [...this.requestMetrics];
+    }
+
+    const normalized = providerName.toLowerCase();
+    return this.requestMetrics.filter(metric => metric.provider.toLowerCase() === normalized);
+  }
+
+  getProviderMetricsSummary(): ProviderMetricsSummary[] {
+    const summaryMap = new Map<
+      string,
+      {
+        provider: ProviderMetricsSummary['provider'];
+        model: string;
+        totalRequests: number;
+        successfulRequests: number;
+        latencySum: number;
+        costSum: number;
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+        lastUpdated: number;
+      }
+    >();
+
+    for (const metric of this.requestMetrics) {
+      const key = `${metric.provider}:${metric.model}`;
+      if (!summaryMap.has(key)) {
+        summaryMap.set(key, {
+          provider: metric.provider,
+          model: metric.model,
+          totalRequests: 0,
+          successfulRequests: 0,
+          latencySum: 0,
+          costSum: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          lastUpdated: metric.timestamp
+        });
+      }
+
+      const entry = summaryMap.get(key)!;
+      entry.totalRequests += 1;
+      entry.lastUpdated = Math.max(entry.lastUpdated, metric.timestamp);
+
+      if (metric.success) {
+        entry.successfulRequests += 1;
+        entry.latencySum += metric.latencyMs;
+        entry.costSum += metric.costUsd;
+        entry.promptTokens += metric.promptTokens;
+        entry.completionTokens += metric.completionTokens;
+        entry.totalTokens += metric.totalTokens;
+      }
+    }
+
+    return Array.from(summaryMap.values()).map(entry => ({
+      provider: entry.provider,
+      model: entry.model,
+      totalRequests: entry.totalRequests,
+      successfulRequests: entry.successfulRequests,
+      successRate: entry.totalRequests > 0 ? entry.successfulRequests / entry.totalRequests : 0,
+      avgLatencyMs: entry.successfulRequests > 0 ? entry.latencySum / entry.successfulRequests : 0,
+      avgCostUsd: entry.successfulRequests > 0 ? entry.costSum / entry.successfulRequests : 0,
+      promptTokens: entry.promptTokens,
+      completionTokens: entry.completionTokens,
+      totalTokens: entry.totalTokens,
+      lastUpdated: entry.lastUpdated
+    }));
+  }
+
+  getMetricsSnapshot(): { requests: LLMRequestMetric[]; providers: ProviderMetricsSummary[] } {
+    return {
+      requests: this.getRequestMetrics(),
+      providers: this.getProviderMetricsSummary()
+    };
+  }
+
+  estimateCost(
+    provider: LLMConfig['provider'],
+    promptTokens: number,
+    completionTokens: number
+  ): number {
+    return this.calculateCost(provider, promptTokens, completionTokens);
+  }
+
+  estimateCostFromTotalTokens(
+    provider: LLMConfig['provider'],
+    totalTokens: number,
+    completionRatio: number = 0.5
+  ): number {
+    if (totalTokens <= 0) {
+      return 0;
+    }
+
+    const completionTokens = Math.round(totalTokens * completionRatio);
+    const promptTokens = Math.max(totalTokens - completionTokens, 0);
+    return this.calculateCost(provider, promptTokens, completionTokens);
+  }
+
+  async queryByProvider(
+    providerName: string,
+    prompt: string,
+    model?: string,
+    requestId?: string
+  ): Promise<string> {
+    const index = this.findConfigIndex(providerName, model);
+    if (index === -1) {
+      if (this.panel.length > 0) {
+        const fallbackRequestId = requestId ? `${requestId}:fallback` : undefined;
+        return this.queryLLM(0, prompt, fallbackRequestId);
+      }
+      throw new Error(`No LLM configuration found for provider: ${providerName}`);
+    }
+
+    return this.queryLLM(index, prompt, requestId);
+  }
+
+  private findConfigIndex(providerName: string, model?: string): number {
+    const normalized = providerName.toLowerCase();
+
+    if (model) {
+      const exactMatch = this.panel.findIndex(
+        config =>
+          config.provider.toLowerCase() === normalized && config.model.toLowerCase() === model.toLowerCase()
+      );
+      if (exactMatch !== -1) {
+        return exactMatch;
+      }
+    }
+
+    return this.panel.findIndex(config => config.provider.toLowerCase() === normalized);
+  }
+
+  private getConfigsByProviders(providerNames?: string[]): { config: LLMConfig; index: number }[] {
+    const entries = this.panel.map((config, index) => ({ config, index }));
+
+    if (!providerNames || providerNames.length === 0) {
+      return entries;
+    }
+
+    const normalizedOrder = providerNames.map(name => name.toLowerCase());
+
+    return entries
+      .filter(entry => normalizedOrder.includes(entry.config.provider.toLowerCase()))
+      .sort(
+        (a, b) =>
+          normalizedOrder.indexOf(a.config.provider.toLowerCase()) -
+          normalizedOrder.indexOf(b.config.provider.toLowerCase())
+      );
   }
 
   /**
@@ -311,20 +559,11 @@ Respond with ONLY the option you choose, exactly as written.`;
    * Generate response from a specific provider
    * Compatibility method to support existing API usage
    */
-  async generateResponse(providerName: string, prompt: string): Promise<string> {
-    // Find the first config that matches the provider
-    const configIndex = this.panel.findIndex(config => 
-      config.provider.toLowerCase() === providerName.toLowerCase()
-    );
-    
-    if (configIndex === -1) {
-      // Fallback to the first available LLM if provider not found
-      if (this.panel.length > 0) {
-        return this.queryLLM(0, prompt);
-      }
-      throw new Error(`No LLM configuration found for provider: ${providerName}`);
-    }
-    
-    return this.queryLLM(configIndex, prompt);
+  async generateResponse(
+    providerName: string,
+    prompt: string,
+    options?: { requestId?: string; model?: string }
+  ): Promise<string> {
+    return this.queryByProvider(providerName, prompt, options?.model, options?.requestId);
   }
 }

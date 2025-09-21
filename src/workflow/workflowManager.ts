@@ -11,6 +11,7 @@
 
 import * as vscode from 'vscode';
 import { LLMManager } from '../llm/llmManager';
+import { AgentEconomy, RoutingAllocation, RoutingPlan } from '../llm/agentEconomy';
 import { VectorDB } from '../db/vectorDB';
 import { GitManager } from '../git/gitManager';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
@@ -75,6 +76,12 @@ export class WorkflowManager {
   /** Unique identifier for this workspace session */
   private workspaceId: string;
 
+  /** Agent economy responsible for routing decisions */
+  private agentEconomy: AgentEconomy;
+
+  /** Current routing plan provided by the agent economy */
+  private workflowRoutingPlan?: RoutingPlan;
+
   /**
    * Initialize the WorkflowManager with required dependencies
    *
@@ -99,6 +106,8 @@ export class WorkflowManager {
       userFeedback: [],
       iterations: 0,
     };
+
+    this.agentEconomy = new AgentEconomy(this.llmManager);
 
     this.initializeCollaboration();
   }
@@ -139,6 +148,67 @@ export class WorkflowManager {
     }
   }
 
+  private refreshRoutingPlan(
+    context: string,
+    priority: 'low' | 'medium' | 'high' | 'critical',
+    costBudget?: number
+  ): RoutingPlan {
+    const plan = this.agentEconomy.createRoutingPlan({
+      requestId: `${this.workspaceId}-${context}-${Date.now()}`,
+      prompt: this.projectIdea || context,
+      priority,
+      costBudget,
+      contextType: 'workflow',
+      metadata: { context }
+    });
+    this.workflowRoutingPlan = plan;
+    return plan;
+  }
+
+  private ensureRoutingPlan(
+    context: string = 'default',
+    priority: 'low' | 'medium' | 'high' | 'critical' = 'medium'
+  ): RoutingPlan {
+    if (!this.workflowRoutingPlan || this.workflowRoutingPlan.allocations.length === 0) {
+      return this.refreshRoutingPlan(context, priority);
+    }
+    return this.workflowRoutingPlan;
+  }
+
+  private getActiveProviderNames(): string[] {
+    const plan = this.ensureRoutingPlan();
+    if (!plan.allocations.length) {
+      return this.llmManager.getPanelConfigurations().map(config => config.provider);
+    }
+    return plan.allocations.map(allocation => allocation.provider);
+  }
+
+  private getPrimaryAllocation(): RoutingAllocation {
+    const plan = this.ensureRoutingPlan();
+    if (!plan.allocations.length) {
+      throw new Error('Agent economy returned no routing allocations');
+    }
+    return plan.allocations[0];
+  }
+
+  private createWorkflowRequestId(label: string): string {
+    return `${this.workspaceId}:${label}:${Date.now()}`;
+  }
+
+  private mapPhasePriority(phase: string): 'low' | 'medium' | 'high' | 'critical' {
+    switch (phase) {
+      case 'Deployment':
+        return 'high';
+      case 'Testing':
+        return 'high';
+      case 'Prototyping':
+        return 'medium';
+      case 'Planning':
+      default:
+        return 'medium';
+    }
+  }
+
   /**
    * Start a new development workflow from a project idea
    *
@@ -158,32 +228,48 @@ export class WorkflowManager {
     this.currentPhase = 0;
 
     try {
+      this.refreshRoutingPlan('initial-planning', option === 'letPanelDecide' ? 'high' : 'medium');
+      const providerNames = this.getActiveProviderNames();
+
       let prompt = idea;
       if (option === 'letPanelDecide') {
-        prompt = await this.llmManager.conference(`Refine this project idea: ${idea}`);
+        prompt = await this.llmManager.conference(
+          `Refine this project idea: ${idea}`,
+          providerNames,
+          this.createWorkflowRequestId('refine-idea')
+        );
       }
 
       // Step 2: Conferencing
       const discussion = await this.llmManager.conference(
-        `Discuss project: ${prompt}. Propose tech stack, estimates, plan.`
+        `Discuss project: ${prompt}. Propose tech stack, estimates, plan.`,
+        providerNames,
+        this.createWorkflowRequestId('initial-conference')
       );
 
-      this.buildPlan = await this.llmManager.voteOnDecision(discussion, [
-        'Approve Plan',
-        'Need Questions',
-      ]);
+      this.buildPlan = await this.llmManager.voteOnDecision(
+        discussion,
+        ['Approve Plan', 'Need Questions'],
+        providerNames,
+        this.createWorkflowRequestId('plan-vote')
+      );
 
       if (this.buildPlan === 'Need Questions') {
-        const questions = await this.llmManager.queryLLM(
-          0,
-          `Generate 5-10 questions for clarification on ${prompt}`
+        const primaryAllocation = this.getPrimaryAllocation();
+        const questions = await this.llmManager.queryByProvider(
+          primaryAllocation.provider,
+          `Generate 5-10 questions for clarification on ${prompt}`,
+          primaryAllocation.model,
+          this.createWorkflowRequestId('clarification-questions')
         );
         const answers = await vscode.window.showInputBox({
           prompt: `Please answer these questions: ${questions}`,
         });
         if (answers) {
           this.buildPlan = await this.llmManager.conference(
-            `Incorporate answers: ${answers}. Finalize plan.`
+            `Incorporate answers: ${answers}. Finalize plan.`,
+            providerNames,
+            this.createWorkflowRequestId('incorporate-answers')
           );
         }
       }
@@ -205,6 +291,9 @@ export class WorkflowManager {
     this.metrics.phaseStartTime = Date.now();
 
     try {
+      this.refreshRoutingPlan(`phase-${phase.toLowerCase()}`, this.mapPhasePriority(phase));
+      const providerNames = this.getActiveProviderNames();
+
       // Get current workflow state for RL
       const currentState = this.getCurrentWorkflowState();
 
@@ -240,7 +329,11 @@ export class WorkflowManager {
 
       // Generate phase content with enhanced prompting
       const phasePrompt = this.buildEnhancedPrompt(phase, contextText);
-      const output = await this.llmManager.conference(phasePrompt);
+      const output = await this.llmManager.conference(
+        phasePrompt,
+        providerNames,
+        this.createWorkflowRequestId(`phase-${phase}-execution`)
+      );
 
       // Process and validate output
       const processedOutput = await this.processPhaseOutput(output, phase);
@@ -494,7 +587,11 @@ export class WorkflowManager {
 
   private async conductPhaseReview(output: string, phase: string): Promise<string> {
     const reviewPrompt = `Review this ${phase} phase output for quality, completeness, and potential issues:\n\n${output}`;
-    return await this.llmManager.conference(reviewPrompt);
+    return await this.llmManager.conference(
+      reviewPrompt,
+      this.getActiveProviderNames(),
+      this.createWorkflowRequestId(`review-${phase}`)
+    );
   }
 
   private async generateIntelligentSuggestions(
@@ -503,7 +600,13 @@ export class WorkflowManager {
     contextText: string
   ): Promise<string> {
     const suggestionPrompt = `Based on the ${phase} output and context, suggest 3-5 specific improvements or innovations:\n\nOutput:\n${output}\n\nContext:\n${contextText}`;
-    return await this.llmManager.queryLLM(0, suggestionPrompt);
+    const primary = this.getPrimaryAllocation();
+    return await this.llmManager.queryByProvider(
+      primary.provider,
+      suggestionPrompt,
+      primary.model,
+      this.createWorkflowRequestId(`suggestions-${phase}`)
+    );
   }
 
   private async getUserDecision(suggestions: string, review: string): Promise<string> {
@@ -538,7 +641,9 @@ export class WorkflowManager {
       case 'Apply suggestions': {
         feedback = 0.9;
         const improvedOutput = await this.llmManager.conference(
-          `Apply these suggestions: ${suggestions} to improve: ${output}`
+          `Apply these suggestions: ${suggestions} to improve: ${output}`,
+          this.getActiveProviderNames(),
+          this.createWorkflowRequestId(`apply-suggestions-${phase}`)
         );
         await this.writePhaseOutput(improvedOutput, `${phase}_improved`);
         break;
@@ -551,7 +656,9 @@ export class WorkflowManager {
         });
         if (modification) {
           const modifiedOutput = await this.llmManager.conference(
-            `Apply these modifications: ${modification} to: ${output}`
+            `Apply these modifications: ${modification} to: ${output}`,
+            this.getActiveProviderNames(),
+            this.createWorkflowRequestId(`apply-modifications-${phase}`)
           );
           await this.writePhaseOutput(modifiedOutput, `${phase}_modified`);
         }
@@ -560,9 +667,12 @@ export class WorkflowManager {
 
       case 'Get more details': {
         feedback = 0.6;
-        const details = await this.llmManager.queryLLM(
-          0,
-          `Provide more detailed explanation for: ${output}`
+        const primary = this.getPrimaryAllocation();
+        const details = await this.llmManager.queryByProvider(
+          primary.provider,
+          `Provide more detailed explanation for: ${output}`,
+          primary.model,
+          this.createWorkflowRequestId(`details-${phase}`)
         );
         vscode.window.showInformationMessage(`Details: ${details.substring(0, 200)}...`);
         break;
@@ -656,18 +766,25 @@ export class WorkflowManager {
 
   private async completeProject() {
     try {
+      this.refreshRoutingPlan('project-completion', 'high');
+      const primary = this.getPrimaryAllocation();
+
       // Generate comprehensive final report with metrics
       const totalTime = Date.now() - this.metrics.startTime;
       const rlStats = this.workflowRL.getStats();
 
-      const report = await this.llmManager.queryLLM(
-        0,
-        `Generate a comprehensive final report for ${this.projectIdea}. Include project summary, key achievements, and lessons learned.`
+      const report = await this.llmManager.queryByProvider(
+        primary.provider,
+        `Generate a comprehensive final report for ${this.projectIdea}. Include project summary, key achievements, and lessons learned.`,
+        primary.model,
+        this.createWorkflowRequestId('final-report')
       );
 
-      const bonuses = await this.llmManager.queryLLM(
-        0,
-        `Suggest 5 innovative A+ enhancements for ${this.projectIdea}, considering cutting-edge technologies like AI, blockchain, and real-time collaboration.`
+      const bonuses = await this.llmManager.queryByProvider(
+        primary.provider,
+        `Suggest 5 innovative A+ enhancements for ${this.projectIdea}, considering cutting-edge technologies like AI, blockchain, and real-time collaboration.`,
+        primary.model,
+        this.createWorkflowRequestId('final-enhancements')
       );
 
       const finalReport = `# AstraForge Project Completion Report
