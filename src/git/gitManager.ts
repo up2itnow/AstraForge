@@ -2,11 +2,13 @@ import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
+import { CommitAnalyzer } from '../utils/commitAnalyzer';
 
 const execAsync = promisify(exec);
 
 export class GitManager {
   private workspacePath: string | undefined;
+  private commitAnalyzer = new CommitAnalyzer();
 
   getWorkspacePath(): string | undefined {
     return this.workspacePath;
@@ -223,6 +225,27 @@ export class GitManager {
         vscode.window.showErrorMessage(`Git commit failed: ${error.message}`);
       }
     }
+  }
+
+  /**
+   * Analyze commit message for severity and create a commit with appropriate priority
+   */
+  async commitWithSeverityAnalysis(message: string): Promise<void> {
+    const analysis = this.commitAnalyzer.analyzeSeverity(message);
+    
+    // Add severity prefix to commit message if severity keywords were found
+    let enhancedMessage = message;
+    if (analysis.hasSeverityKeywords && analysis.severity !== 'low') {
+      enhancedMessage = `[${analysis.severity.toUpperCase()}] ${message}`;
+    }
+    
+    // Show user the analysis results
+    if (analysis.hasSeverityKeywords) {
+      const severityInfo = `Detected severity: ${analysis.severity} (keywords: ${analysis.matchedKeywords.join(', ')})`;
+      vscode.window.showInformationMessage(severityInfo);
+    }
+    
+    await this.commit(enhancedMessage);
   }
 }
 

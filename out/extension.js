@@ -8,6 +8,7 @@ let llmManager;
 let vectorDB;
 let workflowManager;
 let gitManager;
+let specKitManager;
 export async function activate(context) {
     console.log('AstraForge IDE activated! Launching into the stratosphere...');
     // Register providers immediately but lazy-load heavy modules
@@ -44,6 +45,21 @@ async function registerProviders(context) {
         resolveWebviewView: async (webviewView, context, token) => {
             const provider = await getProjectIgnition();
             return provider.resolveWebviewView(webviewView, context, token);
+        },
+    }));
+    let specTelemetry;
+    const getSpecTelemetry = async () => {
+        await Promise.all([ensureWorkflowManager(context), ensureSpecKitManager(context)]);
+        if (!specTelemetry) {
+            const { SpecTelemetryDashboardProvider } = await import('./providers/specTelemetryDashboard');
+            specTelemetry = new SpecTelemetryDashboardProvider(context.extensionUri, specKitManager, gitManager, workflowManager);
+        }
+        return specTelemetry;
+    };
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider('astraforge.specTelemetry', {
+        resolveWebviewView: async (webviewView, viewContext, token) => {
+            const provider = await getSpecTelemetry();
+            return provider.resolveWebviewView(webviewView, viewContext, token);
         },
     }));
 }
@@ -134,6 +150,14 @@ async function ensureWorkflowManager(context) {
         workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
     }
     return workflowManager;
+}
+async function ensureSpecKitManager(context) {
+    if (!specKitManager) {
+        await Promise.all([ensureLLMManager(), ensureVectorDB(context), ensureGitManager()]);
+        const { SpecKitManager } = await import('./spec-kit/specKitManager');
+        specKitManager = new SpecKitManager(llmManager, vectorDB, gitManager);
+    }
+    return specKitManager;
 }
 export function deactivate() {
     if (vectorDB) {

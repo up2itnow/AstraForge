@@ -52,7 +52,6 @@ export class ApiTesterCore {
     }
     async testBatchLLM(provider, apiKey, model, prompts) {
         const startTime = Date.now();
-        const results = [];
         // Process prompts in parallel for better performance
         const testPromises = prompts.map(async (prompt, index) => {
             const result = await this.testLLM(provider, apiKey, model, prompt);
@@ -89,7 +88,7 @@ export class ApiTesterCore {
                 latency,
             };
         }
-        catch (error) {
+        catch (_error) {
             const latency = Date.now() - startTime;
             return {
                 success: false,
