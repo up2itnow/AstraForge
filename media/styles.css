@@ -158,6 +158,11 @@ label {
   background-color: rgba(0, 0, 0, 0.25);
 }
 
+.telemetry-card.telemetry-session_error {
+  border-color: var(--vscode-inputValidation-warningBorder, #d19a66);
+  background-color: rgba(209, 154, 102, 0.15);
+}
+
 .telemetry-header {
   font-size: 12px;
   opacity: 0.8;

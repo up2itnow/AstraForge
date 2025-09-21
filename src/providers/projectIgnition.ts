@@ -18,8 +18,6 @@ export class ProjectIgnitionProvider implements vscode.WebviewViewProvider {
 
       this._view.postMessage({ type: 'swarmTelemetry', payload: event });
     };
-
-    this._workflowManager.on('swarm_telemetry', this._telemetryListener);
   }
 
   public resolveWebviewView(
@@ -36,6 +34,9 @@ export class ProjectIgnitionProvider implements vscode.WebviewViewProvider {
     };
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+
+    this._workflowManager.off('swarm_telemetry', this._telemetryListener);
+    this._workflowManager.on('swarm_telemetry', this._telemetryListener);
 
     this.sendInitialState(webviewView.webview);
 
@@ -57,6 +58,7 @@ export class ProjectIgnitionProvider implements vscode.WebviewViewProvider {
   }
 
   public dispose(): void {
+    this._workflowManager.off('swarm_telemetry', this._telemetryListener);
     this._view = undefined;
   }
 

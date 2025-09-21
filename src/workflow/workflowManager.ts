@@ -114,7 +114,8 @@ export class WorkflowManager extends EventEmitter {
   constructor(
     private llmManager: LLMManager,
     private vectorDB: VectorDB,
-    private gitManager: GitManager
+    private gitManager: GitManager,
+    sessionManager?: CollaborativeSessionManager
   ) {
     super();
     this.workflowRL = new AdaptiveWorkflowRL();
@@ -127,7 +128,8 @@ export class WorkflowManager extends EventEmitter {
       iterations: 0,
     };
 
-    this.sessionManager = new CollaborativeSessionManager(this.llmManager, this.vectorDB);
+    this.sessionManager = sessionManager
+      ?? new CollaborativeSessionManager(this.llmManager, this.vectorDB);
     this.phaseArbitrationModes = this.phases.reduce((acc, phase) => {
       acc[phase] = 'human';
       return acc;
@@ -660,7 +662,6 @@ export class WorkflowManager extends EventEmitter {
     phase: string,
     processedOutput: string
   ): Promise<{
-    session: CollaborativeSession;
     telemetry: RoundOutcomeTelemetry[];
     collaborativeContent?: string;
     summary: string;
@@ -684,33 +685,61 @@ export class WorkflowManager extends EventEmitter {
     };
 
     this.pendingPhase = phase;
-    const session = await this.sessionManager.startSession(collaborationRequest);
-    const telemetry = this.sessionTelemetry.get(session.id) ?? [];
-    const collaborativeContent = session.output?.content;
-    const summary = this.buildConsensusSummary(telemetry);
+    let sessionId: string | undefined;
 
-    this.emit('swarm_telemetry', {
-      type: 'session_summary',
-      payload: {
-        sessionId: session.id,
-        phase,
-        summary,
+    try {
+      const session = await this.sessionManager.startSession(collaborationRequest);
+      sessionId = session.id;
+
+      const telemetry = this.sessionTelemetry.get(session.id) ?? [];
+      const collaborativeContent = session.output?.content;
+      const summary = this.buildConsensusSummary(telemetry);
+
+      this.emit('swarm_telemetry', {
+        type: 'session_summary',
+        payload: {
+          sessionId: session.id,
+          phase,
+          summary,
+          telemetry,
+          qualityScore: session.output?.qualityScore ?? 0,
+          timestamp: Date.now()
+        }
+      });
+
+      return {
         telemetry,
-        qualityScore: session.output?.qualityScore ?? 0,
-        timestamp: Date.now()
+        collaborativeContent,
+        summary
+      };
+    } catch (error: any) {
+      const message = error?.message ?? String(error);
+      vscode.window.showWarningMessage(
+        `Swarm collaboration unavailable for ${phase}: ${message}`
+      );
+
+      this.emit('swarm_telemetry', {
+        type: 'session_error',
+        payload: {
+          phase,
+          summary: 'Swarm collaboration unavailable',
+          message,
+          timestamp: Date.now()
+        }
+      });
+
+      return {
+        telemetry: [],
+        summary: 'Swarm collaboration unavailable'
+      };
+    } finally {
+      if (sessionId) {
+        this.sessionTelemetry.delete(sessionId);
+        this.activeSessionPhase.delete(sessionId);
       }
-    });
 
-    this.sessionTelemetry.delete(session.id);
-    this.activeSessionPhase.delete(session.id);
-    this.pendingPhase = undefined;
-
-    return {
-      session,
-      telemetry,
-      collaborativeContent,
-      summary
-    };
+      this.pendingPhase = undefined;
+    }
   }
 
   private async getUserDecision(suggestions: string, review: string): Promise<string> {

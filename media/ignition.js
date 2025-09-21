@@ -103,6 +103,8 @@ function appendTelemetryCard(event) {
     summary.textContent = event.payload?.summary ?? 'Session summary';
   } else if (event.type === 'arbitration_mode_updated') {
     summary.textContent = `Arbitration for ${event.payload?.phase} set to ${event.payload?.mode}`;
+  } else if (event.type === 'session_error') {
+    summary.textContent = event.payload?.summary ?? 'Swarm collaboration unavailable';
   } else {
     summary.textContent = event.payload?.summary ?? 'Swarm update';
   }
@@ -133,6 +135,13 @@ function appendTelemetryCard(event) {
     footer.className = 'telemetry-footer';
     footer.textContent = `Quality score: ${event.payload?.qualityScore ?? 0}`;
     card.appendChild(footer);
+  }
+
+  if (event.type === 'session_error' && event.payload?.message) {
+    const detail = document.createElement('div');
+    detail.className = 'telemetry-metrics';
+    detail.textContent = event.payload.message;
+    card.appendChild(detail);
   }
 
   feed.prepend(card);
