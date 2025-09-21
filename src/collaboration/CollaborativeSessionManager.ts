@@ -9,14 +9,19 @@
 // vscode not required directly in this manager
 import { EventEmitter } from 'events';
 import { 
-  CollaborativeSession, 
-  CollaborationRequest, 
-  LLMParticipant, 
+  CollaborativeSession,
+  CollaborationRequest,
+  LLMParticipant,
   SessionMetrics,
   CollaborationEvent,
   CollaborationError,
   CollaborativeOutput,
-  RoundType
+  RoundType,
+  ConsensusLevel,
+  RoundOutcomeTelemetry,
+  DissentVector,
+  SuggestedPatch,
+  Contribution
 } from './types/collaborationTypes';
 import { TimeManager } from './timing/TimeManager';
 import { CollaborationRound } from './rounds/CollaborationRound';
@@ -198,6 +203,13 @@ export class CollaborativeSessionManager extends EventEmitter {
 
       round.status = 'completed';
       round.endTime = new Date();
+
+      const outcome = this.analyzeRoundOutcome(session, round);
+      const roundOutput = round.generateRoundOutput();
+      roundOutput.consensusLevel = this.mapConsensusStrengthToLevel(outcome.consensusStrength);
+      roundOutput.qualityScore = Math.round(outcome.metrics.averageConfidence);
+      round.roundOutput = roundOutput;
+      this.emitEvent('round_completed', session.id, { round, outcome });
 
     } catch (error) {
       logger.error(`❌ Round ${round.id} failed:`, error);
@@ -448,6 +460,168 @@ export class CollaborativeSessionManager extends EventEmitter {
     logger.info(`📊 Quality Score: ${session.output.qualityScore}`);
     logger.info(`🎯 Consensus Level: ${session.output.consensusLevel}`);
     logger.info(`⚡ Token Usage: ${session.output.tokenUsage.totalTokens}`);
+  }
+
+  private analyzeRoundOutcome(session: CollaborativeSession, round: CollaborationRound): RoundOutcomeTelemetry {
+    const contributions = round.contributions;
+    const averageConfidence = contributions.length > 0
+      ? contributions.reduce((sum, contribution) => sum + contribution.confidence, 0) / contributions.length
+      : 0;
+
+    const dissentVectors = this.deriveDissentVectors(contributions);
+    const participantIds = new Set(contributions.map(contribution => contribution.author.id));
+    const participantEngagement = session.participants.length > 0
+      ? participantIds.size / session.participants.length
+      : 0;
+    const critiqueCoverage = contributions.length > 0
+      ? contributions.filter(contribution => contribution.critiques.length > 0).length / contributions.length
+      : 0;
+
+    const consensusStrength = this.calculateConsensusStrength(
+      averageConfidence,
+      critiqueCoverage,
+      participantEngagement
+    );
+
+    const suggestedPatches = this.deriveSuggestedPatches(contributions);
+
+    return {
+      roundId: round.id,
+      roundType: round.type,
+      consensusStrength,
+      dissentVectors,
+      suggestedPatches,
+      metrics: {
+        averageConfidence: Number(averageConfidence.toFixed(2)),
+        critiqueCoverage: Number((critiqueCoverage * 100).toFixed(2)),
+        participantEngagement: Number((participantEngagement * 100).toFixed(2))
+      }
+    };
+  }
+
+  private calculateConsensusStrength(
+    averageConfidence: number,
+    critiqueCoverage: number,
+    participantEngagement: number
+  ): number {
+    const base = averageConfidence * 0.7;
+    const dissentPenalty = critiqueCoverage * 35; // Encourage healthy dissent but penalize overwhelming disagreement
+    const engagementBoost = participantEngagement * 20;
+
+    return Math.max(0, Math.min(100, Math.round(base - dissentPenalty + engagementBoost)));
+  }
+
+  private deriveDissentVectors(contributions: Contribution[]): DissentVector[] {
+    const dissent: DissentVector[] = [];
+
+    contributions.forEach(contribution => {
+      contribution.critiques.forEach(targetContribution => {
+        dissent.push({
+          sourceContribution: contribution.id,
+          targetContribution,
+          originator: contribution.author.id,
+          severity: this.estimateDissentSeverity(contribution),
+          summary: this.extractSummarySnippet(contribution.content)
+        });
+      });
+    });
+
+    return dissent;
+  }
+
+  private estimateDissentSeverity(contribution: Contribution): 'low' | 'medium' | 'high' {
+    const emphasisMatches = (contribution.content.match(/\b(critical|blocker|major|urgent|severe)\b/gi) || []).length;
+
+    if (emphasisMatches > 0 || contribution.confidence >= 90) {
+      return 'high';
+    }
+
+    if (contribution.confidence >= 75) {
+      return 'medium';
+    }
+
+    return 'low';
+  }
+
+  private deriveSuggestedPatches(contributions: Contribution[]): SuggestedPatch[] {
+    const patches: SuggestedPatch[] = [];
+
+    contributions.forEach(contribution => {
+      const candidatePhrases = this.extractCandidatePhrases(contribution.content);
+
+      candidatePhrases.forEach(phrase => {
+        patches.push({
+          description: phrase,
+          originatingContribution: contribution.id,
+          confidence: contribution.confidence,
+          priority: this.determinePriority(contribution.confidence, contribution.content),
+          affectedAreas: this.extractAffectedAreas(phrase)
+        });
+      });
+    });
+
+    return patches.slice(0, 8);
+  }
+
+  private extractCandidatePhrases(content: string): string[] {
+    const lines = content.split(/\n+/).map(line => line.trim()).filter(Boolean);
+    const directiveLines = lines.filter(line => /(should|need|recommend|consider|ensure|improve|fix)/i.test(line));
+
+    const normalized = directiveLines.length > 0 ? directiveLines : lines.slice(0, 2);
+
+    return normalized
+      .map(line => (line.length > 200 ? `${line.slice(0, 197)}...` : line))
+      .filter(line => line.length > 0);
+  }
+
+  private determinePriority(confidence: number, content: string): 'low' | 'medium' | 'high' {
+    const severityKeywords = /(critical|blocker|security|regression|failure|outage)/i;
+
+    if (severityKeywords.test(content) || confidence >= 90) {
+      return 'high';
+    }
+
+    if (confidence >= 70) {
+      return 'medium';
+    }
+
+    return 'low';
+  }
+
+  private extractAffectedAreas(phrase: string): string[] {
+    const knownAreas = ['api', 'ui', 'database', 'security', 'performance', 'tests', 'documentation'];
+    const lowerPhrase = phrase.toLowerCase();
+
+    const matched = knownAreas.filter(area => lowerPhrase.includes(area));
+
+    if (matched.length === 0) {
+      return [];
+    }
+
+    return Array.from(new Set(matched));
+  }
+
+  private extractSummarySnippet(content: string): string {
+    const sentences = content
+      .split(/(?<=[.!?])\s+/)
+      .map(sentence => sentence.trim())
+      .filter(Boolean);
+
+    const snippet = sentences.length > 0 ? sentences[0] : content.substring(0, 160);
+    return snippet.length > 160 ? `${snippet.slice(0, 157)}...` : snippet;
+  }
+
+  private mapConsensusStrengthToLevel(strength: number): ConsensusLevel {
+    if (strength >= 80) {
+      return 'unanimous';
+    }
+    if (strength >= 60) {
+      return 'qualified_majority';
+    }
+    if (strength >= 40) {
+      return 'simple_majority';
+    }
+    return 'forced_consensus';
   }
 
   // Helper methods would continue here...

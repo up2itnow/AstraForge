@@ -227,8 +227,37 @@ export interface CollaborationConfig {
 /**
  * Events emitted by the collaboration system
  */
+export interface DissentVector {
+  sourceContribution: string;
+  targetContribution: string;
+  originator: string;
+  severity: 'low' | 'medium' | 'high';
+  summary: string;
+}
+
+export interface SuggestedPatch {
+  description: string;
+  originatingContribution: string;
+  confidence: number;
+  priority: 'low' | 'medium' | 'high';
+  affectedAreas: string[];
+}
+
+export interface RoundOutcomeTelemetry {
+  roundId: string;
+  roundType: RoundType;
+  consensusStrength: number;
+  dissentVectors: DissentVector[];
+  suggestedPatches: SuggestedPatch[];
+  metrics: {
+    averageConfidence: number;
+    critiqueCoverage: number;
+    participantEngagement: number;
+  };
+}
+
 export interface CollaborationEvent {
-  type: 'session_started' | 'round_started' | 'contribution_received' | 
+  type: 'session_started' | 'round_started' | 'round_completed' | 'contribution_received' |
         'consensus_reached' | 'timeout_warning' | 'session_completed' | 'error';
   sessionId: string;
   timestamp: Date;

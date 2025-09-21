@@ -10,12 +10,20 @@
  */
 
 import * as vscode from 'vscode';
+import { EventEmitter } from 'events';
+import * as path from 'path';
 import { LLMManager } from '../llm/llmManager';
 import { VectorDB } from '../db/vectorDB';
 import { GitManager } from '../git/gitManager';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
-import * as path from 'path';
+import { CollaborativeSessionManager } from '../collaboration/CollaborativeSessionManager';
+import {
+  CollaborationEvent,
+  CollaborationRequest,
+  CollaborativeSession,
+  RoundOutcomeTelemetry
+} from '../collaboration/types/collaborationTypes';
 
 /**
  * Metrics tracking for workflow performance and user engagement
@@ -33,6 +41,14 @@ interface WorkflowMetrics {
   iterations: number;
 }
 
+interface SwarmTelemetryEvent {
+  sessionId: string;
+  phase: string;
+  outcome: RoundOutcomeTelemetry;
+  timestamp: number;
+  summary: string;
+}
+
 /**
  * Main workflow orchestrator that manages the complete development lifecycle
  *
@@ -45,7 +61,7 @@ interface WorkflowMetrics {
  * - Git integration for version control
  * - User oversight and feedback integration
  */
-export class WorkflowManager {
+export class WorkflowManager extends EventEmitter {
   /** Current phase index in the workflow */
   private currentPhase = 0;
 
@@ -70,6 +86,24 @@ export class WorkflowManager {
   /** Unique identifier for this workspace session */
   private workspaceId: string;
 
+  /** Multi-LLM collaboration orchestrator */
+  private sessionManager: CollaborativeSessionManager;
+
+  /** Per-session telemetry collected from collaboration rounds */
+  private sessionTelemetry: Map<string, RoundOutcomeTelemetry[]> = new Map();
+
+  /** Mapping between active collaboration sessions and workflow phases */
+  private activeSessionPhase: Map<string, string> = new Map();
+
+  /** Recently emitted telemetry for UI consumers */
+  private recentTelemetry: SwarmTelemetryEvent[] = [];
+
+  /** Pending phase context for the next collaborative session */
+  private pendingPhase?: string;
+
+  /** Arbitration preferences for each workflow phase */
+  private phaseArbitrationModes: Record<string, 'autonomous' | 'human'>;
+
   /**
    * Initialize the WorkflowManager with required dependencies
    *
@@ -80,8 +114,9 @@ export class WorkflowManager {
   constructor(
     private llmManager: LLMManager,
     private vectorDB: VectorDB,
-  private gitManager: GitManager
+    private gitManager: GitManager
   ) {
+    super();
     this.workflowRL = new AdaptiveWorkflowRL();
     this.workspaceId = `workspace_${Date.now()}`;
     this.metrics = {
@@ -91,6 +126,14 @@ export class WorkflowManager {
       userFeedback: [],
       iterations: 0,
     };
+
+    this.sessionManager = new CollaborativeSessionManager(this.llmManager, this.vectorDB);
+    this.phaseArbitrationModes = this.phases.reduce((acc, phase) => {
+      acc[phase] = 'human';
+      return acc;
+    }, {} as Record<string, 'autonomous' | 'human'>);
+
+    this.registerCollaborationTelemetry();
 
     this.initializeCollaboration();
   }
@@ -129,6 +172,72 @@ export class WorkflowManager {
       // Do not reset vectorInitPromise to undefined to prevent race conditions
       throw error;
     }
+  }
+
+  private registerCollaborationTelemetry(): void {
+    this.sessionManager.on('session_started', (event: CollaborationEvent) => {
+      if (this.pendingPhase) {
+        this.activeSessionPhase.set(event.sessionId, this.pendingPhase);
+        this.pendingPhase = undefined;
+      }
+    });
+
+    this.sessionManager.on('round_completed', (event: CollaborationEvent) => {
+      const outcome = event.data?.outcome as RoundOutcomeTelemetry | undefined;
+      if (!outcome) {
+        return;
+      }
+
+      const phase = this.activeSessionPhase.get(event.sessionId)
+        ?? this.pendingPhase
+        ?? this.phases[Math.min(this.currentPhase, this.phases.length - 1)]
+        ?? 'Unknown';
+
+      const outcomes = this.sessionTelemetry.get(event.sessionId) ?? [];
+      outcomes.push(outcome);
+      this.sessionTelemetry.set(event.sessionId, outcomes);
+
+      const telemetryRecord: SwarmTelemetryEvent = {
+        sessionId: event.sessionId,
+        phase,
+        outcome,
+        timestamp: Date.now(),
+        summary: this.buildRoundSummary(outcome)
+      };
+
+      this.recentTelemetry.push(telemetryRecord);
+      if (this.recentTelemetry.length > 50) {
+        this.recentTelemetry = this.recentTelemetry.slice(-50);
+      }
+
+      this.emit('swarm_telemetry', { type: 'round', payload: telemetryRecord });
+    });
+
+    this.sessionManager.on('session_completed', (event: CollaborationEvent) => {
+      const session = event.data?.session as CollaborativeSession | undefined;
+      const phase = this.activeSessionPhase.get(event.sessionId)
+        ?? this.pendingPhase
+        ?? this.phases[Math.min(this.currentPhase, this.phases.length - 1)]
+        ?? 'Unknown';
+
+      const outcomes = this.sessionTelemetry.get(event.sessionId) ?? [];
+      const summary = this.buildConsensusSummary(outcomes);
+
+      this.emit('swarm_telemetry', {
+        type: 'session_complete',
+        payload: {
+          sessionId: event.sessionId,
+          phase,
+          summary,
+          qualityScore: session?.output?.qualityScore ?? 0,
+          consensusLevel: session?.output?.consensusLevel ?? 'simple_majority',
+          outcomes,
+          timestamp: Date.now()
+        }
+      });
+
+      this.activeSessionPhase.delete(event.sessionId);
+    });
   }
 
   /**
@@ -237,28 +346,48 @@ export class WorkflowManager {
       // Process and validate output
       const processedOutput = await this.processPhaseOutput(output, phase);
 
+      // Swarm orchestration before commit
+      const collaborationResult = await this.orchestratePhaseCollaboration(phase, processedOutput);
+      const arbitrationMode = this.phaseArbitrationModes[phase] ?? 'human';
+      const finalPhaseOutput =
+        arbitrationMode === 'autonomous' && collaborationResult.collaborativeContent
+          ? collaborationResult.collaborativeContent
+          : processedOutput;
+
       // Write output to file with better organization
-      await this.writePhaseOutput(processedOutput, phase);
+      await this.writePhaseOutput(finalPhaseOutput, phase);
 
-      // Git commit with detailed message
-      await this.gitManager.commit(`Phase ${phase} complete - ${this.getPhaseMetrics()}`);
-
-      // Enhanced review with multiple perspectives
-      const review = await this.conductPhaseReview(processedOutput, phase);
-
-      // Intelligent suggestions using context
-      const suggestions = await this.generateIntelligentSuggestions(
-        phase,
-        processedOutput,
-        contextText
+      // Git commit with telemetry summary
+      const consensusSummary = collaborationResult.summary;
+      await this.gitManager.commit(
+        `Phase ${phase} complete - ${this.getPhaseMetrics()} | Consensus ${consensusSummary}`
       );
 
-      // User interaction with better UX
-      const userDecision = await this.getUserDecision(suggestions, review);
+      // Enhanced review with multiple perspectives
+      const review = await this.conductPhaseReview(finalPhaseOutput, phase);
+
+      // Intelligent suggestions using context plus swarm telemetry
+      const suggestions = await this.generateIntelligentSuggestions(
+        phase,
+        finalPhaseOutput,
+        contextText
+      );
+      const telemetryAugmentedSuggestions = this.appendSwarmInsights(
+        suggestions,
+        collaborationResult.telemetry,
+        collaborationResult.collaborativeContent
+      );
+
+      // User interaction with better UX respecting arbitration mode
+      const userDecision =
+        arbitrationMode === 'human'
+          ? await this.getUserDecision(telemetryAugmentedSuggestions, review)
+          : 'Apply suggestions';
+
       const userFeedback = await this.processUserDecision(
         userDecision,
-        suggestions,
-        processedOutput,
+        telemetryAugmentedSuggestions,
+        finalPhaseOutput,
         phase
       );
 
@@ -275,7 +404,7 @@ export class WorkflowManager {
       this.workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
 
       // Store phase results in vector DB for future context
-      await this.storePhaseContext(phase, processedOutput, review);
+      await this.storePhaseContext(phase, finalPhaseOutput, review);
 
       this.metrics.iterations++;
       this.currentPhase++;
@@ -347,6 +476,92 @@ export class WorkflowManager {
       this.metrics.userFeedback.reduce((sum, rating) => sum + rating, 0) /
       this.metrics.userFeedback.length
     );
+  }
+
+  public getRecentTelemetry(limit = 20): SwarmTelemetryEvent[] {
+    return this.recentTelemetry.slice(-limit);
+  }
+
+  public getPhaseArbitrationModes(): Record<string, 'autonomous' | 'human'> {
+    return { ...this.phaseArbitrationModes };
+  }
+
+  public setPhaseArbitrationMode(phase: string, mode: 'autonomous' | 'human'): void {
+    if (!this.phases.includes(phase)) {
+      return;
+    }
+
+    this.phaseArbitrationModes[phase] = mode;
+    this.emit('swarm_telemetry', { type: 'arbitration_mode_updated', payload: { phase, mode } });
+  }
+
+  private buildRoundSummary(outcome: RoundOutcomeTelemetry): string {
+    const dissentCount = outcome.dissentVectors.length;
+    const topPatch = outcome.suggestedPatches[0]?.description ?? 'No patches suggested';
+    const trimmedPatch = topPatch.length > 120 ? `${topPatch.slice(0, 117)}...` : topPatch;
+
+    return `Consensus ${Math.round(outcome.consensusStrength)}% | Dissent ${dissentCount} | ${trimmedPatch}`;
+  }
+
+  private buildConsensusSummary(outcomes: RoundOutcomeTelemetry[]): string {
+    if (outcomes.length === 0) {
+      return 'No telemetry';
+    }
+
+    const averageConsensus = Math.round(
+      outcomes.reduce((sum, outcome) => sum + outcome.consensusStrength, 0) / outcomes.length
+    );
+    const dissentSignals = outcomes.reduce((sum, outcome) => sum + outcome.dissentVectors.length, 0);
+    const patchCount = outcomes.reduce((sum, outcome) => sum + outcome.suggestedPatches.length, 0);
+
+    return `${averageConsensus}% avg consensus • ${dissentSignals} dissent signals • ${patchCount} patches`;
+  }
+
+  private appendSwarmInsights(
+    originalSuggestions: string,
+    outcomes: RoundOutcomeTelemetry[],
+    collaborativeContent?: string
+  ): string {
+    if (outcomes.length === 0 && !collaborativeContent) {
+      return originalSuggestions;
+    }
+
+    const lines: string[] = [];
+    if (outcomes.length > 0) {
+      const averageConsensus = Math.round(
+        outcomes.reduce((sum, outcome) => sum + outcome.consensusStrength, 0) / outcomes.length
+      );
+      lines.push(`- Consensus strength across swarm: ${averageConsensus}%`);
+
+      const patchHighlights = this.formatPatchHighlights(outcomes);
+      patchHighlights.forEach(highlight => lines.push(`- ${highlight}`));
+    }
+
+    if (collaborativeContent) {
+      const preview = collaborativeContent.length > 160
+        ? `${collaborativeContent.slice(0, 157)}...`
+        : collaborativeContent;
+      lines.push(`- Synthesized direction: ${preview}`);
+    }
+
+    if (lines.length === 0) {
+      return originalSuggestions;
+    }
+
+    return `${originalSuggestions}\n\n### Swarm Insights\n${lines.join('\n')}`;
+  }
+
+  private formatPatchHighlights(outcomes: RoundOutcomeTelemetry[]): string[] {
+    const highlights: string[] = [];
+
+    outcomes.forEach(outcome => {
+      outcome.suggestedPatches.slice(0, 2).forEach(patch => {
+        const priorityLabel = patch.priority.toUpperCase();
+        highlights.push(`${priorityLabel}: ${patch.description}`);
+      });
+    });
+
+    return highlights.slice(0, 5);
   }
 
   private async applyRLAction(action: any, phase: string): Promise<{ shouldReturn: boolean }> {
@@ -439,6 +654,63 @@ export class WorkflowManager {
   ): Promise<string> {
     const suggestionPrompt = `Based on the ${phase} output and context, suggest 3-5 specific improvements or innovations:\n\nOutput:\n${output}\n\nContext:\n${contextText}`;
     return await this.llmManager.queryLLM(0, suggestionPrompt);
+  }
+
+  private async orchestratePhaseCollaboration(
+    phase: string,
+    processedOutput: string
+  ): Promise<{
+    session: CollaborativeSession;
+    telemetry: RoundOutcomeTelemetry[];
+    collaborativeContent?: string;
+    summary: string;
+  }> {
+    const collaborationRequest: CollaborationRequest = {
+      prompt: `You are coordinating a swarm of specialists. Critique and synthesize the ${phase} phase deliverable below. ` +
+        `Identify dissent, surface actionable patches, and return a consensus-ready refinement.\n\n${processedOutput}`,
+      context: processedOutput,
+      requirements: [
+        'Summarize critiques with severity levels',
+        'Recommend concrete patches before commit',
+        'Report consensus strength and dissent vectors'
+      ],
+      constraints: [
+        'Keep recommendations focused on this phase only',
+        'Avoid altering unrelated project scope'
+      ],
+      maxRounds: 3,
+      consensusThreshold: 70,
+      priority: 'high'
+    };
+
+    this.pendingPhase = phase;
+    const session = await this.sessionManager.startSession(collaborationRequest);
+    const telemetry = this.sessionTelemetry.get(session.id) ?? [];
+    const collaborativeContent = session.output?.content;
+    const summary = this.buildConsensusSummary(telemetry);
+
+    this.emit('swarm_telemetry', {
+      type: 'session_summary',
+      payload: {
+        sessionId: session.id,
+        phase,
+        summary,
+        telemetry,
+        qualityScore: session.output?.qualityScore ?? 0,
+        timestamp: Date.now()
+      }
+    });
+
+    this.sessionTelemetry.delete(session.id);
+    this.activeSessionPhase.delete(session.id);
+    this.pendingPhase = undefined;
+
+    return {
+      session,
+      telemetry,
+      collaborativeContent,
+      summary
+    };
   }
 
   private async getUserDecision(suggestions: string, review: string): Promise<string> {
