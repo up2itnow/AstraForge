@@ -16,6 +16,7 @@ import { GitManager } from '../git/gitManager';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
 import * as path from 'path';
+import { PhaseEvaluator, PhaseTelemetry } from '../testing/phaseEvaluator';
 
 /**
  * Metrics tracking for workflow performance and user engagement
@@ -61,6 +62,9 @@ export class WorkflowManager {
   /** Reinforcement learning system for workflow optimization */
   private workflowRL: AdaptiveWorkflowRL;
 
+  /** Automated evaluator that validates each phase post human review */
+  private phaseEvaluator?: PhaseEvaluator;
+
   /** Optional collaboration server for multi-user workflows */
   private collaborationServer?: CollaborationServer;
 
@@ -80,9 +84,12 @@ export class WorkflowManager {
   constructor(
     private llmManager: LLMManager,
     private vectorDB: VectorDB,
-  private gitManager: GitManager
+    private gitManager: GitManager,
+    phaseEvaluator?: PhaseEvaluator
   ) {
     this.workflowRL = new AdaptiveWorkflowRL();
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    this.phaseEvaluator = phaseEvaluator ?? new PhaseEvaluator(workspaceRoot);
     this.workspaceId = `workspace_${Date.now()}`;
     this.metrics = {
       startTime: Date.now(),
@@ -262,6 +269,12 @@ export class WorkflowManager {
         phase
       );
 
+      const evaluationTelemetry = await this.triggerPostPhaseEvaluation({
+        phase,
+        decision: userDecision,
+        feedback: userFeedback,
+      });
+
       // Update RL with feedback
       const newState = this.getCurrentWorkflowState();
       const reward = this.workflowRL.calculateReward(
@@ -269,7 +282,8 @@ export class WorkflowManager {
         recommendedAction,
         newState,
         true, // Phase succeeded
-        userFeedback
+        userFeedback,
+        evaluationTelemetry
       );
 
       this.workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
@@ -506,6 +520,42 @@ export class WorkflowManager {
 
     this.metrics.userFeedback.push(feedback);
     return feedback;
+  }
+
+  private async triggerPostPhaseEvaluation(params: {
+    phase: string;
+    decision: string;
+    feedback: number;
+  }): Promise<PhaseTelemetry | undefined> {
+    if (!this.phaseEvaluator) {
+      return undefined;
+    }
+
+    try {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const telemetry = await this.phaseEvaluator.evaluatePhase({
+        phase: params.phase,
+        humanDecision: params.decision,
+        humanFeedback: params.feedback,
+        iteration: this.metrics.iterations + 1,
+        workspaceRoot,
+      });
+
+      const summarized = this.phaseEvaluator.summarizeTelemetry(telemetry);
+      this.collaborationServer?.broadcastToWorkspace(
+        this.workspaceId,
+        'phase_evaluated',
+        {
+          phase: params.phase,
+          telemetry: summarized,
+        }
+      );
+
+      return telemetry;
+    } catch (error) {
+      console.warn('Post-phase evaluation failed:', error);
+      return undefined;
+    }
   }
 
   private async storePhaseContext(phase: string, output: string, review: string): Promise<void> {

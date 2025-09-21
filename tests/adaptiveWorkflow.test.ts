@@ -3,6 +3,7 @@
  */
 
 import { AdaptiveWorkflowRL } from '../src/rl/adaptiveWorkflow';
+import { PhaseTelemetry } from '../src/testing/phaseEvaluator';
 
 // Type definitions for test data
 interface WorkflowState {
@@ -22,12 +23,34 @@ interface WorkflowAction {
 // Mock global for localStorage simulation
 const mockGlobal = global as any;
 
+const buildTelemetry = (
+  phase: string,
+  quality: number,
+  defects: number,
+  coverage: number,
+  latencyMs: number
+): PhaseTelemetry => ({
+  phase,
+  timestamp: Date.now(),
+  durationMs: latencyMs,
+  success: defects === 0,
+  metrics: [
+    { key: 'quality.score', value: quality },
+    { key: 'coverage.lines', value: coverage },
+    { key: 'coverage.statements', value: coverage },
+    { key: 'defects.count', value: defects },
+    { key: 'latency.totalMs', value: latencyMs },
+  ],
+  commandResults: [],
+});
+
 describe('AdaptiveWorkflowRL', () => {
   let rl: AdaptiveWorkflowRL;
 
   beforeEach(() => {
     // Clear global storage
     delete mockGlobal.astraforge_qtable;
+    delete mockGlobal.astraforge_phaseTelemetry;
     rl = new AdaptiveWorkflowRL();
   });
 
@@ -371,6 +394,57 @@ describe('AdaptiveWorkflowRL', () => {
 
       expect(reward).toBeLessThanOrEqual(2.0);
       expect(reward).toBeGreaterThanOrEqual(-2.0);
+    });
+
+    it('should incorporate evaluator telemetry into rewards', () => {
+      const action: WorkflowAction = { type: 'continue', confidence: 1.0 };
+      const baseReward = rl.calculateReward(oldState, action, newState, true);
+
+      const highQualityTelemetry = buildTelemetry('Planning', 0.9, 0, 0.85, 1200);
+      const highQualityReward = rl.calculateReward(
+        oldState,
+        action,
+        newState,
+        true,
+        undefined,
+        highQualityTelemetry
+      );
+
+      delete mockGlobal.astraforge_phaseTelemetry;
+      const rlLowQuality = new AdaptiveWorkflowRL();
+      const lowQualityTelemetry = buildTelemetry('Planning', 0.3, 2, 0.4, 90000);
+      const lowQualityReward = rlLowQuality.calculateReward(
+        oldState,
+        action,
+        newState,
+        true,
+        undefined,
+        lowQualityTelemetry
+      );
+
+      expect(highQualityReward).toBeGreaterThan(baseReward);
+      expect(lowQualityReward).toBeLessThanOrEqual(baseReward);
+      expect(highQualityReward).toBeGreaterThan(lowQualityReward);
+    });
+
+    it('should adapt exploration rate using telemetry deltas', () => {
+      const action: WorkflowAction = { type: 'continue', confidence: 1.0 };
+      const initialRate = (rl as any).explorationRate;
+
+      const baselineTelemetry = buildTelemetry('Planning', 0.5, 0, 0.6, 4000);
+      rl.calculateReward(oldState, action, newState, true, undefined, baselineTelemetry);
+
+      const improvedTelemetry = buildTelemetry('Planning', 0.85, 0, 0.9, 2500);
+      rl.calculateReward(oldState, action, newState, true, undefined, improvedTelemetry);
+
+      const reducedRate = (rl as any).explorationRate;
+      expect(reducedRate).toBeLessThan(initialRate);
+
+      const regressedTelemetry = buildTelemetry('Planning', 0.3, 1, 0.4, 7000);
+      rl.calculateReward(oldState, action, newState, true, undefined, regressedTelemetry);
+
+      const increasedRate = (rl as any).explorationRate;
+      expect(increasedRate).toBeGreaterThan(reducedRate);
     });
   });
 
