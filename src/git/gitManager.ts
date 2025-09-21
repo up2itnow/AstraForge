@@ -1,11 +1,111 @@
 import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as path from 'path';
 
 const execAsync = promisify(exec);
 
 export class GitManager {
   private workspacePath: string | undefined;
+
+  getWorkspacePath(): string | undefined {
+    return this.workspacePath;
+  }
+
+  async getFileDiffs(paths: string[]): Promise<Record<string, GitFileDiff>> {
+    if (!this.workspacePath) {
+      return {};
+    }
+
+    const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
+    const results: Record<string, GitFileDiff> = {};
+
+    for (const target of uniquePaths) {
+      const normalized = this.normalizePath(target);
+      if (!normalized) {
+        continue;
+      }
+
+      try {
+        const statusResult = await execAsync(`git status --porcelain -- "${normalized}"`, {
+          cwd: this.workspacePath,
+        });
+
+        const statusLine = statusResult.stdout.trim().split('\n').find(line => line.trim());
+        const status = this.parseStatusCode(statusLine);
+
+        let diff = '';
+        if (status !== 'clean') {
+          try {
+            const diffResult = await execAsync(`git diff -- "${normalized}"`, {
+              cwd: this.workspacePath,
+            });
+            diff = diffResult.stdout;
+          } catch (diffError: any) {
+            diff = diffError.stdout || '';
+          }
+        }
+
+        results[normalized] = { status, diff };
+      } catch (error: any) {
+        results[normalized] = {
+          status: 'unknown',
+          error: error.message,
+        };
+      }
+    }
+
+    return results;
+  }
+
+  private normalizePath(filePath: string): string | null {
+    if (!this.workspacePath) {
+      return null;
+    }
+
+    const cleaned = filePath.replace(/"/g, '').trim();
+    if (!cleaned || cleaned === 'multiple') {
+      return null;
+    }
+
+    const absolute = path.isAbsolute(cleaned)
+      ? cleaned
+      : path.join(this.workspacePath, cleaned);
+    const relative = path.relative(this.workspacePath, absolute).replace(/\\/g, '/');
+
+    if (!relative || relative.startsWith('..')) {
+      return null;
+    }
+
+    return relative;
+  }
+
+  private parseStatusCode(statusLine?: string): GitDiffStatus {
+    if (!statusLine) {
+      return 'clean';
+    }
+
+    const code = statusLine.substring(0, 2).trim();
+    switch (code) {
+      case 'M':
+      case 'MM':
+      case 'AM':
+      case 'MD':
+        return 'modified';
+      case 'A':
+        return 'added';
+      case '??':
+        return 'untracked';
+      case 'D':
+      case 'AD':
+      case 'DM':
+        return 'deleted';
+      case 'R':
+        return 'renamed';
+      default:
+        return code === '' ? 'clean' : 'unknown';
+    }
+  }
 
   async initRepo(path: string) {
     this.workspacePath = path;
@@ -124,4 +224,19 @@ export class GitManager {
       }
     }
   }
+}
+
+export type GitDiffStatus =
+  | 'clean'
+  | 'modified'
+  | 'added'
+  | 'deleted'
+  | 'renamed'
+  | 'untracked'
+  | 'unknown';
+
+export interface GitFileDiff {
+  status: GitDiffStatus;
+  diff?: string;
+  error?: string;
 }

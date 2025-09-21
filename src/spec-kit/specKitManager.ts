@@ -194,7 +194,9 @@ export class SpecKitManager {
     }
     
     await fs.promises.writeFile(specPath, spec.content, 'utf8');
-    
+
+    const acceptanceArtifact = await this.writeAcceptanceArtifacts(workflow);
+
     // Save to vector DB for context
     await this.vectorDB.addDocument(`spec-${workflowId}`, spec.content, {
       type: 'specification',
@@ -204,7 +206,10 @@ export class SpecKitManager {
     
     // Auto-commit if enabled
     if (this.config.autoCommit) {
-      const filesToCommit = this.getGitRelativePaths(workspaceDir, [specPath]);
+      const filesToCommit = this.getGitRelativePaths(
+        workspaceDir,
+        [specPath, acceptanceArtifact].filter((value): value is string => Boolean(value))
+      );
       if (filesToCommit.length > 0) {
         await this.gitManager.addAndCommit(filesToCommit, `Add specification: ${spec.title}`);
       }
@@ -334,7 +339,9 @@ export class SpecKitManager {
     }
     
     await fs.promises.writeFile(tasksPath, taskList.content, 'utf8');
-    
+
+    const taskGraphPath = await this.writeTaskGraphArtifacts(workflow, taskList);
+
     // Save to vector DB
     await this.vectorDB.addDocument(`tasks-${workflowId}`, taskList.content, {
       type: 'tasks',
@@ -344,7 +351,10 @@ export class SpecKitManager {
     
     // Auto-commit if enabled
     if (this.config.autoCommit) {
-      const filesToCommit = this.getGitRelativePaths(workflow.workspaceDir, [tasksPath]);
+      const filesToCommit = this.getGitRelativePaths(
+        workflow.workspaceDir,
+        [tasksPath, taskGraphPath].filter((value): value is string => Boolean(value))
+      );
       if (filesToCommit.length > 0) {
         await this.gitManager.addAndCommit(filesToCommit, `Add task list: ${workflow.featureName}`);
       }
@@ -785,6 +795,77 @@ All code reviews verify constitutional compliance.
     };
 
     await processDirectory(resolvedSource, '');
+  }
+
+  private async writeAcceptanceArtifacts(workflow: SpecKitWorkflow): Promise<string | null> {
+    if (!workflow.spec) {
+      return null;
+    }
+
+    const acceptancePath = createSafePath(workflow.specsDir, 'acceptance-criteria.json');
+    if (!acceptancePath) {
+      logger.warn('Unable to resolve acceptance criteria artifact path safely.');
+      return null;
+    }
+
+    const payload = {
+      workflowId: workflow.id,
+      featureName: workflow.featureName,
+      generatedAt: workflow.createdAt.toISOString(),
+      updatedAt: workflow.updatedAt.toISOString(),
+      acceptanceCriteria: workflow.spec.acceptanceCriteria || [],
+      userScenarios: workflow.spec.userScenarios,
+      functionalRequirements: workflow.spec.functionalRequirements,
+      clarifications: workflow.spec.clarificationNeeded,
+      constitutionCompliance: workflow.spec.constitutionCompliance,
+    };
+
+    await fs.promises.writeFile(acceptancePath, JSON.stringify(payload, null, 2), 'utf8');
+    return acceptancePath;
+  }
+
+  private async writeTaskGraphArtifacts(
+    workflow: SpecKitWorkflow,
+    taskList: TaskList
+  ): Promise<string | null> {
+    const graphPath = createSafePath(workflow.specsDir, 'task-graph.json');
+    if (!graphPath) {
+      logger.warn('Unable to resolve task graph artifact path safely.');
+      return null;
+    }
+
+    const edges = taskList.dependencies.flatMap(dependency =>
+      dependency.dependsOn.map(dependsOn => ({
+        from: dependsOn,
+        to: dependency.taskId,
+        reason: dependency.reason,
+      }))
+    );
+
+    const payload = {
+      metadata: {
+        workflowId: workflow.id,
+        featureName: workflow.featureName,
+        generatedAt: new Date().toISOString(),
+        estimatedDuration: taskList.estimatedDuration,
+      },
+      nodes: taskList.tasks.map(task => ({
+        id: task.id,
+        phase: task.phase,
+        description: task.description,
+        filePath: task.filePath,
+        prerequisites: task.prerequisites,
+        estimatedTime: task.estimatedTime,
+        type: task.type,
+        priority: task.priority,
+      })),
+      edges,
+      parallelGroups: taskList.parallelGroups,
+      acceptanceCriteria: workflow.spec?.acceptanceCriteria || [],
+    };
+
+    await fs.promises.writeFile(graphPath, JSON.stringify(payload, null, 2), 'utf8');
+    return graphPath;
   }
 
   private getGitRelativePaths(workspaceDir: string, pathsToAdd: string[]): string[] {

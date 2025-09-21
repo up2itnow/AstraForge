@@ -17,6 +17,7 @@ export interface GeneratedSpec {
   clarificationNeeded: string[];
   functionalRequirements: string[];
   userScenarios: string[];
+  acceptanceCriteria: string[];
   keyEntities: string[];
   constitutionCompliance: ConstitutionCheck;
 }
@@ -120,6 +121,7 @@ export class SpecGenerator {
       clarificationNeeded: clarifications,
       functionalRequirements: specSections.functionalRequirements,
       userScenarios: specSections.userScenarios,
+      acceptanceCriteria: specSections.acceptanceScenarios || [],
       keyEntities: specSections.keyEntities,
       constitutionCompliance: constitutionCheck
     };
@@ -441,6 +443,7 @@ export class SpecGenerator {
       clarificationNeeded: analysis.clarificationNeeded,
       functionalRequirements: analysis.functionalRequirements,
       userScenarios: analysis.userScenarios,
+      acceptanceCriteria: analysis.acceptanceCriteria || analysis.acceptanceScenarios || [],
       keyEntities: analysis.keyEntities,
       constitutionCompliance: analysis.constitutionCompliance
     };
@@ -459,6 +462,7 @@ export class SpecGenerator {
       "clarificationNeeded": ["list of clarifications"],
       "functionalRequirements": ["list of requirements"],
       "userScenarios": ["list of scenarios"],
+      "acceptanceCriteria": ["list of acceptance checks"],
       "keyEntities": ["list of entities"],
       "constitutionCompliance": {
         "passed": boolean,
@@ -479,6 +483,7 @@ export class SpecGenerator {
         clarificationNeeded: [],
         functionalRequirements: [],
         userScenarios: [],
+        acceptanceCriteria: [],
         keyEntities: [],
         constitutionCompliance: { passed: true, violations: [], warnings: [], complexityScore: 5 }
       };
