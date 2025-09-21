@@ -22,6 +22,34 @@ export interface LLMResponse {
   metadata?: Record<string, any>;
 }
 
+export interface LLMRequestMetric {
+  provider: LLMConfig['provider'];
+  model: string;
+  success: boolean;
+  timestamp: number;
+  latencyMs: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  requestId?: string;
+  errorMessage?: string;
+}
+
+export interface ProviderMetricsSummary {
+  provider: LLMConfig['provider'];
+  model: string;
+  totalRequests: number;
+  successfulRequests: number;
+  successRate: number;
+  avgLatencyMs: number;
+  avgCostUsd: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  lastUpdated: number;
+}
+
 export interface LLMProvider {
   /**
    * Query the LLM with a prompt

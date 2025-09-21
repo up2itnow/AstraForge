@@ -21,6 +21,7 @@ import {
 import { TimeManager } from './timing/TimeManager';
 import { CollaborationRound } from './rounds/CollaborationRound';
 import { LLMManager } from '../llm/llmManager';
+import { AgentEconomy, RoutingPlan } from '../llm/agentEconomy';
 import { VectorDB } from '../db/vectorDB';
 import { logger } from '../utils/logger';
 
@@ -29,6 +30,7 @@ export class CollaborativeSessionManager extends EventEmitter {
   private timeManager: TimeManager;
   private sessionIdCounter = 0;
   private testMode: boolean = false;
+  private agentEconomy: AgentEconomy;
 
   constructor(
     private llmManager: LLMManager,
@@ -38,6 +40,7 @@ export class CollaborativeSessionManager extends EventEmitter {
     super();
     this.timeManager = new TimeManager();
     this.testMode = testMode || process.env.NODE_ENV === 'test';
+    this.agentEconomy = new AgentEconomy(this.llmManager);
     this.setupEventHandlers();
   }
 
@@ -54,8 +57,30 @@ export class CollaborativeSessionManager extends EventEmitter {
       // Validate request
       this.validateRequest(request);
 
+      const routingPlan = this.agentEconomy.createRoutingPlan({
+        requestId: sessionId,
+        prompt: request.prompt,
+        priority: request.priority,
+        costBudget: request.costBudget,
+        contextType: 'collaboration',
+        expectedParticipants: request.maxRounds,
+        metadata: {
+          requirements: request.requirements?.length || 0,
+          constraints: request.constraints?.length || 0
+        }
+      });
+      if (routingPlan.allocations.length > 0) {
+        logger.info(
+          `📊 Routing plan for ${sessionId}: ${routingPlan.allocations
+            .map(allocation => `${allocation.provider}:${allocation.model}:${allocation.role}`)
+            .join(', ')}`
+        );
+      } else {
+        logger.warn(`⚠️ Agent economy did not return allocations for session ${sessionId}, using defaults.`);
+      }
+
       // Select participants
-      const participants = await this.selectParticipants(request);
+      const participants = await this.selectParticipants(request, routingPlan);
       
       // Create session
       const session: CollaborativeSession = {
@@ -222,8 +247,12 @@ export class CollaborativeSessionManager extends EventEmitter {
       .map(async (participant) => {
         try {
           const response = await this.llmManager.generateResponse(
-            participant.provider.toLowerCase(),
-            proposalPrompt
+            participant.provider,
+            proposalPrompt,
+            {
+              requestId: `${session.id}:${round.id}:${participant.id}:proposal`,
+              model: participant.model
+            }
           );
 
           const contribution = {
@@ -278,8 +307,12 @@ export class CollaborativeSessionManager extends EventEmitter {
       .map(async (participant) => {
         try {
           const response = await this.llmManager.generateResponse(
-            participant.provider.toLowerCase(),
-            critiquePrompt
+            participant.provider,
+            critiquePrompt,
+            {
+              requestId: `${session.id}:${round.id}:${participant.id}:critique`,
+              model: participant.model
+            }
           );
 
           const contribution = {
@@ -336,8 +369,12 @@ export class CollaborativeSessionManager extends EventEmitter {
     
     try {
       const response = await this.llmManager.generateResponse(
-        synthesizer.provider.toLowerCase(),
-        synthesisPrompt
+        synthesizer.provider,
+        synthesisPrompt,
+        {
+          requestId: `${session.id}:${round.id}:${synthesizer.id}:synthesis`,
+          model: synthesizer.model
+        }
       );
 
       const contribution = {
@@ -388,8 +425,12 @@ export class CollaborativeSessionManager extends EventEmitter {
       .map(async (participant) => {
         try {
           const response = await this.llmManager.generateResponse(
-            participant.provider.toLowerCase(),
-            validationPrompt
+            participant.provider,
+            validationPrompt,
+            {
+              requestId: `${session.id}:${round.id}:${participant.id}:validation`,
+              model: participant.model
+            }
           );
 
           const contribution = {
@@ -465,50 +506,101 @@ export class CollaborativeSessionManager extends EventEmitter {
     }
   }
 
-  private async selectParticipants(request: CollaborationRequest): Promise<LLMParticipant[]> {
-    // Create default participants based on available LLM providers
-    const participants: LLMParticipant[] = [
-      {
-        id: 'openai_participant',
-        provider: 'OpenAI',
-        model: 'gpt-4',
-        role: 'implementer',
-        strengths: ['implementation', 'code_quality', 'bug_detection'],
-        specializations: ['coding', 'technical_analysis'],
-        performanceHistory: [],
-        isActive: true,
-        currentLoad: 0
-      },
-      {
-        id: 'anthropic_participant', 
-        provider: 'Anthropic',
-        model: 'claude-3-sonnet',
-        role: 'reasoner',
-        strengths: ['reasoning', 'logic', 'security'],
-        specializations: ['architecture', 'analysis'],
-        performanceHistory: [],
-        isActive: true,
-        currentLoad: 0
-      },
-      {
-        id: 'grok_participant',
-        provider: 'xAI', 
-        model: 'grok-beta',
-        role: 'innovator',
-        strengths: ['creativity', 'innovation', 'ux_design'],
-        specializations: ['creative_solutions', 'user_experience'],
-        performanceHistory: [],
-        isActive: true,
-        currentLoad: 0
-      }
-    ];
+  private async selectParticipants(
+    request: CollaborationRequest,
+    routingPlan?: RoutingPlan
+  ): Promise<LLMParticipant[]> {
+    let participants: LLMParticipant[] = [];
 
-    // Filter by preferred participants if specified
+    if (routingPlan && routingPlan.allocations.length > 0) {
+      const supportCount = routingPlan.allocations.filter(allocation => allocation.role === 'support').length;
+      participants = routingPlan.allocations.map((allocation, index) => ({
+        id: `${allocation.provider.toLowerCase()}_${index}`,
+        provider: allocation.provider,
+        model: allocation.model,
+        role: this.mapAllocationRole(allocation.role, supportCount),
+        strengths: this.deriveStrengths(allocation.role),
+        specializations: this.deriveSpecializations(allocation.role),
+        performanceHistory: [],
+        isActive: true,
+        currentLoad: Math.round((1 - allocation.capacityScore) * 100)
+      }));
+    } else {
+      participants = [
+        {
+          id: 'openai_participant',
+          provider: 'OpenAI',
+          model: 'gpt-4',
+          role: 'implementer',
+          strengths: ['implementation', 'code_quality', 'bug_detection'],
+          specializations: ['coding', 'technical_analysis'],
+          performanceHistory: [],
+          isActive: true,
+          currentLoad: 0
+        },
+        {
+          id: 'anthropic_participant',
+          provider: 'Anthropic',
+          model: 'claude-3-sonnet',
+          role: 'reasoner',
+          strengths: ['reasoning', 'logic', 'security'],
+          specializations: ['architecture', 'analysis'],
+          performanceHistory: [],
+          isActive: true,
+          currentLoad: 0
+        },
+        {
+          id: 'grok_participant',
+          provider: 'xAI',
+          model: 'grok-beta',
+          role: 'innovator',
+          strengths: ['creativity', 'innovation', 'ux_design'],
+          specializations: ['creative_solutions', 'user_experience'],
+          performanceHistory: [],
+          isActive: true,
+          currentLoad: 0
+        }
+      ];
+    }
+
     if (request.preferredParticipants && request.preferredParticipants.length > 0) {
-      return participants.filter(p => request.preferredParticipants!.includes(p.provider));
+      participants = participants.filter(p => request.preferredParticipants!.includes(p.provider));
     }
 
     return participants;
+  }
+
+  private mapAllocationRole(role: 'primary' | 'secondary' | 'support', supportCount: number): string {
+    switch (role) {
+      case 'primary':
+        return 'coordinator';
+      case 'secondary':
+        return supportCount > 0 ? 'synthesizer' : 'analyst';
+      default:
+        return 'specialist';
+    }
+  }
+
+  private deriveStrengths(role: 'primary' | 'secondary' | 'support'): string[] {
+    switch (role) {
+      case 'primary':
+        return ['coordination', 'decision_making', 'quality_control'];
+      case 'secondary':
+        return ['analysis', 'risk_management', 'knowledge_synthesis'];
+      default:
+        return ['ideation', 'validation', 'support'];
+    }
+  }
+
+  private deriveSpecializations(role: 'primary' | 'secondary' | 'support'): string[] {
+    switch (role) {
+      case 'primary':
+        return ['execution_lead', 'cross_team_alignment'];
+      case 'secondary':
+        return ['insight_generation', 'conflict_resolution'];
+      default:
+        return ['creative_support', 'evidence_gathering'];
+    }
   }
 
   private initializeMetrics(): SessionMetrics {
