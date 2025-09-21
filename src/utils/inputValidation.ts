@@ -6,6 +6,50 @@
 
 import * as path from 'path';
 
+// Static regex patterns to avoid recreation on every function call
+const SCRIPT_SANITIZATION_PATTERNS = {
+  SCRIPT_TAGS: /<script[^>]*>.*?<\/script>/gi,
+  JAVASCRIPT_PROTOCOL: /javascript:/gi,
+  EVENT_HANDLERS: /on\w+\s*=/gi,
+} as const;
+
+const SUSPICIOUS_PATTERNS = [
+  /system\s*:/gi,
+  /(?:ignore|disregard|forget).*(?:instructions|prompt|rules)/gi,
+  /(?:act|pretend|roleplay)\s+as/gi,
+  /(?:you\s+are|you're)\s+(?:now|a)/gi,
+] as const;
+
+const INJECTION_PATTERNS = [
+  /\${.*}/g, // Template literals
+  /<%.*%>/g, // Template tags
+  /{{.*}}/g, // Handlebars/Mustache
+  /\[\[.*\]\]/g, // Wiki/Markdown links that could be exploited
+] as const;
+
+// Path validation patterns
+const PATH_TRAVERSAL_PATTERNS = [
+  /\.\./,           // Standard directory traversal
+  /\.\\/,           // Windows directory traversal
+  /\.\//,           // Current directory references (when used maliciously)
+] as const;
+
+const DANGEROUS_FILENAME_PATTERNS = [
+  /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i,  // Windows reserved names
+  /^\./,                                       // Hidden files starting with dot
+  /[<>:"|?*]/,                                // Invalid filename characters
+] as const;
+
+// Other commonly used patterns
+const CONTROL_CHARACTERS_PATTERN = /[\u0000-\u001f\u007f]/g;
+const HTML_TAGS_PATTERN = /<[^>]*>/g;
+const PATH_SEPARATORS_PATTERN = /[/\\]/g;
+const PATH_PARTS_SPLIT_PATTERN = /[/\\]/;
+const FILENAME_INVALID_CHARS_PATTERN = /[<>:"|?*\u0000-\u001f\u007f]/;
+const RESERVED_NAME_PATTERN = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+const API_KEY_VALID_CHARS_PATTERN = /^[a-zA-Z0-9\-_]+$/;
+const BINARY_CONTENT_PATTERN = /[\u0000-\u0008\u000e-\u001f\u007f]/;
+
 /**
  * Path validation result interface
  */
@@ -36,16 +80,10 @@ export function validateAndSanitizePath(
   }
 
   // Remove null bytes and control characters
-  let sanitized = inputPath.replace(/[\u0000-\u001f\u007f]/g, '');
+  let sanitized = inputPath.replace(CONTROL_CHARACTERS_PATTERN, '');
 
   // Check for path traversal sequences BEFORE sanitization
-  const traversalPatterns = [
-    /\.\./,           // Standard directory traversal
-    /\.\\/,           // Windows directory traversal
-    /\.\//,           // Current directory references (when used maliciously)
-  ];
-
-  const containsTraversal = traversalPatterns.some(pattern => pattern.test(inputPath));
+  const containsTraversal = PATH_TRAVERSAL_PATTERNS.some(pattern => pattern.test(inputPath));
   if (containsTraversal) {
     errors.push('Path contains potentially dangerous traversal sequences');
   }
@@ -66,23 +104,17 @@ export function validateAndSanitizePath(
   }
 
   // Check for dangerous file names in path components
-  const dangerousNames = [
-    /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i,  // Windows reserved names
-    /^\./,                                       // Hidden files starting with dot
-    /[<>:"|?*]/,                                // Invalid filename characters
-  ];
-
-  const pathParts = sanitized.split(/[/\\]/);
+  const pathParts = sanitized.split(PATH_PARTS_SPLIT_PATTERN);
   for (const part of pathParts) {
     if (part) {
       // Check reserved names by removing extension first
       const nameWithoutExt = part.split('.')[0];
-      if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(nameWithoutExt)) {
+      if (RESERVED_NAME_PATTERN.test(nameWithoutExt)) {
         errors.push('Path contains invalid or dangerous filename components');
         break;
       }
       // Check other dangerous patterns
-      if (dangerousNames.slice(1).some(pattern => pattern.test(part))) {
+      if (DANGEROUS_FILENAME_PATTERNS.slice(1).some(pattern => pattern.test(part))) {
         errors.push('Path contains invalid or dangerous filename components');
         break;
       }
@@ -129,13 +161,7 @@ export function createSafePath(basePath: string, userPath: string): string | nul
   }
   
   // Check for path traversal sequences in basePath
-  const dangerousPatterns = [
-    /\.\./,           // Directory traversal
-    /\.\\/,           // Windows directory traversal  
-    /\.\//,           // Current directory references (when used maliciously)
-  ];
-  
-  if (dangerousPatterns.some(pattern => pattern.test(basePath))) {
+  if (PATH_TRAVERSAL_PATTERNS.some(pattern => pattern.test(basePath))) {
     return null;
   }
   
@@ -165,7 +191,7 @@ export function validateFilename(filename: string): ValidationResult {
   }
 
   // Remove path separators - filename should not contain paths
-  const sanitized = filename.replace(/[/\\]/g, '');
+  const sanitized = filename.replace(PATH_SEPARATORS_PATTERN, '');
 
   if (sanitized !== filename) {
     errors.push('Filename cannot contain path separators');
@@ -177,13 +203,13 @@ export function validateFilename(filename: string): ValidationResult {
   }
 
   // Check for dangerous characters
-  if (/[<>:"|?*\u0000-\u001f\u007f]/.test(sanitized)) {
+  if (FILENAME_INVALID_CHARS_PATTERN.test(sanitized)) {
     errors.push('Filename contains invalid characters');
   }
 
   // Check for reserved names (name without extension)
   const nameWithoutExt = path.parse(sanitized).name;
-  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(nameWithoutExt)) {
+  if (RESERVED_NAME_PATTERN.test(nameWithoutExt)) {
     errors.push('Filename uses a reserved system name');
   }
 
@@ -260,28 +286,21 @@ export function validateLLMInput(
   }
 
   // Remove control characters and potentially dangerous content
-  sanitized = sanitized.replace(/[\u0000-\u001f\u007f]/g, '');
+  sanitized = sanitized.replace(CONTROL_CHARACTERS_PATTERN, '');
 
   // HTML/Script sanitization
   if (!options.allowHtml) {
-    sanitized = sanitized.replace(/<[^>]*>/g, '');
+    sanitized = sanitized.replace(HTML_TAGS_PATTERN, '');
   }
 
   if (!options.allowScripts) {
-    sanitized = sanitized.replace(/<script[^>]*>.*?<\/script>/gi, '');
-    sanitized = sanitized.replace(/javascript:/gi, '');
-    sanitized = sanitized.replace(/on\w+\s*=/gi, '');
+    sanitized = sanitized.replace(SCRIPT_SANITIZATION_PATTERNS.SCRIPT_TAGS, '');
+    sanitized = sanitized.replace(SCRIPT_SANITIZATION_PATTERNS.JAVASCRIPT_PROTOCOL, '');
+    sanitized = sanitized.replace(SCRIPT_SANITIZATION_PATTERNS.EVENT_HANDLERS, '');
   }
 
   // Check for suspicious patterns
-  const suspiciousPatterns = [
-    /system\s*:/gi,
-    /(?:ignore|disregard|forget).*(?:instructions|prompt|rules)/gi,
-    /(?:act|pretend|roleplay)\s+as/gi,
-    /(?:you\s+are|you're)\s+(?:now|a)/gi,
-  ];
-
-  for (const pattern of suspiciousPatterns) {
+  for (const pattern of SUSPICIOUS_PATTERNS) {
     if (pattern.test(sanitized)) {
       errors.push('Input contains potentially suspicious content');
       break;
@@ -299,14 +318,7 @@ export function validateLLMInput(
   }
 
   // Check for potential injection attempts
-  const injectionPatterns = [
-    /\${.*}/g, // Template literals
-    /<%.*%>/g, // Template tags
-    /{{.*}}/g, // Handlebars/Mustache
-    /\[\[.*\]\]/g, // Wiki/Markdown links that could be exploited
-  ];
-
-  for (const pattern of injectionPatterns) {
+  for (const pattern of INJECTION_PATTERNS) {
     if (pattern.test(sanitized)) {
       errors.push('Input contains potentially unsafe template syntax');
       break;
@@ -376,7 +388,7 @@ export function validateApiKey(apiKey: string, provider: string): ValidationResu
   }
 
   // Check for suspicious characters
-  if (!/^[a-zA-Z0-9\-_]+$/.test(cleanKey)) {
+  if (!API_KEY_VALID_CHARS_PATTERN.test(cleanKey)) {
     errors.push('API key contains invalid characters');
   }
 
@@ -425,7 +437,7 @@ export function validateFileContent(content: string, filename?: string): Validat
   }
 
   // Check for binary content
-  if (/[\u0000-\u0008\u000e-\u001f\u007f]/.test(content)) {
+  if (BINARY_CONTENT_PATTERN.test(content)) {
     errors.push('File appears to contain binary data');
   }
 

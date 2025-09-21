@@ -10,6 +10,8 @@ export class AdaptiveWorkflowRL {
         this.explorationRate = 0.1;
         this.minExplorationRate = 0.01;
         this.explorationDecay = 0.995;
+        this.telemetryHistory = [];
+        this.maxTelemetryHistory = 50;
         this.phases = ['Planning', 'Prototyping', 'Testing', 'Deployment'];
         this.actions = [
             { type: 'continue', confidence: 1.0 },
@@ -19,6 +21,7 @@ export class AdaptiveWorkflowRL {
             { type: 'optimize', confidence: 0.6 },
         ];
         this.loadQTable();
+        this.loadTelemetryHistory();
     }
     /**
      * Get the best action for a given state using epsilon-greedy policy
@@ -91,7 +94,7 @@ export class AdaptiveWorkflowRL {
     /**
      * Calculate reward based on workflow performance
      */
-    calculateReward(oldState, action, newState, phaseSuccess, userFeedback) {
+    calculateReward(oldState, action, newState, phaseSuccess, userFeedback, telemetry) {
         let reward = 0;
         // Base reward for phase success
         if (phaseSuccess) {
@@ -140,6 +143,41 @@ export class AdaptiveWorkflowRL {
         if (userFeedback !== undefined) {
             reward += (userFeedback - 0.5) * 2.0; // Scale 0-1 feedback to -1 to +1
         }
+        if (telemetry) {
+            const previousTelemetry = this.getPreviousTelemetry(telemetry.phase);
+            const qualityMetric = this.extractMetricValue(telemetry, 'quality.score');
+            if (qualityMetric !== undefined) {
+                reward += (qualityMetric - 0.6); // baseline expectation of 0.6 quality
+            }
+            if (previousTelemetry && qualityMetric !== undefined) {
+                const previousQuality = this.extractMetricValue(previousTelemetry, 'quality.score');
+                if (previousQuality !== undefined) {
+                    const qualityDelta = qualityMetric - previousQuality;
+                    reward += qualityDelta * 1.2;
+                    this.adjustExplorationRate(qualityDelta);
+                }
+            }
+            const coverageAverage = this.getCoverageAverage(telemetry);
+            if (coverageAverage !== undefined) {
+                reward += (coverageAverage - 0.75) * 0.5;
+                if (previousTelemetry) {
+                    const previousCoverage = this.getCoverageAverage(previousTelemetry);
+                    if (previousCoverage !== undefined) {
+                        reward += (coverageAverage - previousCoverage) * 0.5;
+                    }
+                }
+            }
+            const defectMetric = this.extractMetricValue(telemetry, 'defects.count');
+            if (defectMetric !== undefined) {
+                reward -= Math.min(1.5, defectMetric * 0.3);
+            }
+            const latencyMetric = this.extractMetricValue(telemetry, 'latency.totalMs');
+            if (latencyMetric !== undefined) {
+                const normalizedLatency = Math.min(1, latencyMetric / (60 * 1000));
+                reward -= normalizedLatency * 0.2;
+            }
+            this.recordTelemetry(telemetry);
+        }
         return Math.max(-2.0, Math.min(2.0, reward)); // Clamp reward between -2 and +2
     }
     getRandomAction() {
@@ -184,6 +222,68 @@ export class AdaptiveWorkflowRL {
         }
         catch (error) {
             console.warn('RL: Failed to save Q-table:', error);
+        }
+    }
+    recordTelemetry(telemetry) {
+        this.telemetryHistory.push(telemetry);
+        if (this.telemetryHistory.length > this.maxTelemetryHistory) {
+            this.telemetryHistory.shift();
+        }
+        this.saveTelemetryHistory();
+    }
+    getPreviousTelemetry(phase) {
+        for (let index = this.telemetryHistory.length - 1; index >= 0; index--) {
+            const entry = this.telemetryHistory[index];
+            if (entry.phase === phase) {
+                return entry;
+            }
+        }
+        return undefined;
+    }
+    extractMetricValue(telemetry, key) {
+        const metric = telemetry.metrics.find(item => item.key === key);
+        if (!metric || typeof metric.value !== 'number') {
+            return undefined;
+        }
+        return metric.value;
+    }
+    getCoverageAverage(telemetry) {
+        const coverageMetrics = telemetry.metrics.filter(metric => metric.key.startsWith('coverage.'));
+        if (coverageMetrics.length === 0) {
+            return undefined;
+        }
+        const total = coverageMetrics.reduce((sum, metric) => sum + metric.value, 0);
+        return total / coverageMetrics.length;
+    }
+    adjustExplorationRate(deltaQuality) {
+        if (!Number.isFinite(deltaQuality) || deltaQuality === 0) {
+            return;
+        }
+        if (deltaQuality > 0.02) {
+            this.explorationRate = Math.max(this.minExplorationRate, this.explorationRate * 0.9);
+        }
+        else if (deltaQuality < -0.02) {
+            this.explorationRate = Math.min(0.5, this.explorationRate * 1.1 + 0.01);
+        }
+    }
+    saveTelemetryHistory() {
+        try {
+            global.astraforge_phaseTelemetry = this.telemetryHistory;
+        }
+        catch (error) {
+            console.warn('RL: Failed to save telemetry history:', error);
+        }
+    }
+    loadTelemetryHistory() {
+        try {
+            const saved = global.astraforge_phaseTelemetry;
+            if (!saved || !Array.isArray(saved)) {
+                return;
+            }
+            this.telemetryHistory = saved;
+        }
+        catch (error) {
+            console.warn('RL: Failed to load telemetry history:', error);
         }
     }
     loadQTable() {
