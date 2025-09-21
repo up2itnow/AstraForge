@@ -1,5 +1,5 @@
 import { LLMManager } from '../llm/llmManager';
-import { VectorDB } from '../db/vectorDB';
+import { MemoryOrchestrator } from '../db/memoryOrchestrator';
 import { logger } from '../utils/logger';
 import { TechnicalPlan } from './planGenerator';
 import * as fs from 'fs';
@@ -39,12 +39,12 @@ export interface ParallelGroup {
 
 export class TaskGenerator {
   private llmManager: LLMManager;
-  private vectorDB: VectorDB;
+  private memoryOrchestrator: MemoryOrchestrator;
   private taskTemplate: string = '';
 
-  constructor(llmManager: LLMManager, vectorDB: VectorDB) {
+  constructor(llmManager: LLMManager, memoryOrchestrator: MemoryOrchestrator) {
     this.llmManager = llmManager;
-    this.vectorDB = vectorDB;
+    this.memoryOrchestrator = memoryOrchestrator;
     this.loadTaskTemplate();
   }
 

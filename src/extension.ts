@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
 
 // Lazy-loaded module references
 let llmManager: any;
-let vectorDB: any;
+let memoryOrchestrator: any;
 let workflowManager: any;
 let gitManager: any;
 
@@ -145,13 +145,13 @@ async function ensureLLMManager() {
 /**
  * Lazy-load Vector DB
  */
-async function ensureVectorDB(context: vscode.ExtensionContext) {
-  if (!vectorDB) {
-    const { VectorDB } = await import('./db/vectorDB');
-    vectorDB = new VectorDB(context.extensionUri.fsPath);
-    await vectorDB.init();
+async function ensureMemoryOrchestrator(context: vscode.ExtensionContext) {
+  if (!memoryOrchestrator) {
+    const { MemoryOrchestrator } = await import('./db/memoryOrchestrator');
+    memoryOrchestrator = new MemoryOrchestrator(context.extensionUri.fsPath);
+    await memoryOrchestrator.init();
   }
-  return vectorDB;
+  return memoryOrchestrator;
 }
 
 /**
@@ -170,17 +170,17 @@ async function ensureGitManager() {
  */
 async function ensureWorkflowManager(context: vscode.ExtensionContext) {
   if (!workflowManager) {
-    await Promise.all([ensureLLMManager(), ensureVectorDB(context), ensureGitManager()]);
+    await Promise.all([ensureLLMManager(), ensureMemoryOrchestrator(context), ensureGitManager()]);
 
     const { WorkflowManager } = await import('./workflow/workflowManager');
-    workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
+    workflowManager = new WorkflowManager(llmManager, memoryOrchestrator, gitManager);
   }
   return workflowManager;
 }
 
 export function deactivate() {
-  if (vectorDB) {
-    vectorDB.close();
+  if (memoryOrchestrator) {
+    memoryOrchestrator.close();
   }
 
   if (llmManager) {

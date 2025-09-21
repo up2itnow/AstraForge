@@ -1,5 +1,5 @@
 import { LLMManager } from '../llm/llmManager';
-import { VectorDB } from '../db/vectorDB';
+import { MemoryOrchestrator } from '../db/memoryOrchestrator';
 import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -30,12 +30,12 @@ export interface ConstitutionCheck {
 
 export class SpecGenerator {
   private llmManager: LLMManager;
-  private vectorDB: VectorDB;
+  private memoryOrchestrator: MemoryOrchestrator;
   private specTemplate: string = '';
 
-  constructor(llmManager: LLMManager, vectorDB: VectorDB) {
+  constructor(llmManager: LLMManager, memoryOrchestrator: MemoryOrchestrator) {
     this.llmManager = llmManager;
-    this.vectorDB = vectorDB;
+    this.memoryOrchestrator = memoryOrchestrator;
     this.loadSpecTemplate();
   }
 

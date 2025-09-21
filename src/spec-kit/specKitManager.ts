@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { LLMManager } from '../llm/llmManager';
-import { VectorDB } from '../db/vectorDB';
+import { MemoryOrchestrator } from '../db/memoryOrchestrator';
 import { GitManager } from '../git/gitManager';
 import { SpecGenerator, GeneratedSpec, SpecificationRequest } from './specGenerator';
 import { PlanGenerator, TechnicalPlan } from './planGenerator';
@@ -36,7 +36,7 @@ export interface SpecKitConfig {
 
 export class SpecKitManager {
   private llmManager: LLMManager;
-  private vectorDB: VectorDB;
+  private memoryOrchestrator: MemoryOrchestrator;
   private gitManager: GitManager;
   private specGenerator: SpecGenerator;
   private planGenerator: PlanGenerator;
@@ -46,16 +46,16 @@ export class SpecKitManager {
 
   constructor(
     llmManager: LLMManager,
-    vectorDB: VectorDB,
+    memoryOrchestrator: MemoryOrchestrator,
     gitManager: GitManager
   ) {
     this.llmManager = llmManager;
-    this.vectorDB = vectorDB;
+    this.memoryOrchestrator = memoryOrchestrator;
     this.gitManager = gitManager;
-    
-    this.specGenerator = new SpecGenerator(llmManager, vectorDB);
-    this.planGenerator = new PlanGenerator(llmManager, vectorDB);
-    this.taskGenerator = new TaskGenerator(llmManager, vectorDB);
+
+    this.specGenerator = new SpecGenerator(llmManager, memoryOrchestrator);
+    this.planGenerator = new PlanGenerator(llmManager, memoryOrchestrator);
+    this.taskGenerator = new TaskGenerator(llmManager, memoryOrchestrator);
     
     this.config = this.loadConfig();
   }
@@ -196,7 +196,7 @@ export class SpecKitManager {
     await fs.promises.writeFile(specPath, spec.content, 'utf8');
     
     // Save to vector DB for context
-    await this.vectorDB.addDocument(`spec-${workflowId}`, spec.content, {
+    await this.memoryOrchestrator.addDocument(`spec-${workflowId}`, spec.content, {
       type: 'specification',
       workflowId,
       featureName: spec.title
@@ -273,7 +273,7 @@ export class SpecKitManager {
     }
     
     // Save to vector DB
-    await this.vectorDB.addDocument(`plan-${workflowId}`, plan.content, {
+    await this.memoryOrchestrator.addDocument(`plan-${workflowId}`, plan.content, {
       type: 'plan',
       workflowId,
       featureName: workflow.featureName
@@ -336,7 +336,7 @@ export class SpecKitManager {
     await fs.promises.writeFile(tasksPath, taskList.content, 'utf8');
     
     // Save to vector DB
-    await this.vectorDB.addDocument(`tasks-${workflowId}`, taskList.content, {
+    await this.memoryOrchestrator.addDocument(`tasks-${workflowId}`, taskList.content, {
       type: 'tasks',
       workflowId,
       featureName: workflow.featureName
@@ -376,7 +376,7 @@ export class SpecKitManager {
     await fs.promises.writeFile(specPath, refinedSpec.content, 'utf8');
     
     // Update vector DB
-    await this.vectorDB.addDocument(`spec-${workflowId}`, refinedSpec.content, {
+    await this.memoryOrchestrator.addDocument(`spec-${workflowId}`, refinedSpec.content, {
       type: 'specification',
       workflowId,
       featureName: refinedSpec.title

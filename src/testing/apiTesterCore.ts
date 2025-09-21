@@ -1,5 +1,5 @@
 import { LLMManager } from '../llm/llmManager.js';
-import { VectorDB } from '../db/vectorDB.js';
+import { MemoryOrchestrator } from '../db/memoryOrchestrator.js';
 
 export interface TestResult {
   success: boolean;
@@ -33,20 +33,20 @@ export interface VectorTestResult {
 
 export class ApiTesterCore {
   private llmManager: LLMManager;
-  private vectorDB: VectorDB;
+  private memoryOrchestrator: MemoryOrchestrator;
   private testMode: boolean = false;
 
   constructor() {
     this.llmManager = new LLMManager();
-    this.vectorDB = new VectorDB(process.cwd());
+    this.memoryOrchestrator = new MemoryOrchestrator(process.cwd());
   }
 
   async initialize(): Promise<void> {
     try {
-      await this.vectorDB.init();
+      await this.memoryOrchestrator.init();
       this.testMode = true;
     } catch (error) {
-      console.warn('Failed to initialize vector DB for testing:', error);
+      console.warn('Failed to initialize memory orchestrator for testing:', error);
     }
   }
 
@@ -130,8 +130,8 @@ export class ApiTesterCore {
     const startTime = Date.now();
 
     try {
-      const embedding = await this.vectorDB.getEmbedding(query);
-      const results = await this.vectorDB.queryEmbedding(embedding, topK);
+      const embedding = await this.memoryOrchestrator.getEmbedding(query);
+      const results = await this.memoryOrchestrator.queryEmbedding(embedding, topK);
 
       const latency = Date.now() - startTime;
 
@@ -213,7 +213,7 @@ export class ApiTesterCore {
 
   async cleanup(): Promise<void> {
     try {
-      this.vectorDB.close();
+      await this.memoryOrchestrator.close();
     } catch (error) {
       console.warn('Cleanup error:', error);
     }

@@ -21,7 +21,7 @@ import {
 import { TimeManager } from './timing/TimeManager';
 import { CollaborationRound } from './rounds/CollaborationRound';
 import { LLMManager } from '../llm/llmManager';
-import { VectorDB } from '../db/vectorDB';
+import { MemoryOrchestrator } from '../db/memoryOrchestrator';
 import { logger } from '../utils/logger';
 
 export class CollaborativeSessionManager extends EventEmitter {
@@ -32,7 +32,7 @@ export class CollaborativeSessionManager extends EventEmitter {
 
   constructor(
     private llmManager: LLMManager,
-    private vectorDB: VectorDB,
+    private memoryOrchestrator: MemoryOrchestrator,
     testMode: boolean = false
   ) {
     super();
@@ -439,8 +439,8 @@ export class CollaborativeSessionManager extends EventEmitter {
     // Update metrics
     this.updateSessionMetrics(session);
 
-    // Store in vector DB for future reference
-    await this.storeSessionInVectorDB(session);
+      // Persist collaborative output in the shared memory fabric
+    await this.storeSessionInMemory(session);
 
     this.emitEvent('session_completed', session.id, { session });
 
@@ -684,11 +684,11 @@ export class CollaborativeSessionManager extends EventEmitter {
     return [];
   }
 
-  private async storeSessionInVectorDB(session: CollaborativeSession): Promise<void> {
+  private async storeSessionInMemory(session: CollaborativeSession): Promise<void> {
     try {
       if (session.output) {
         const sessionSummary = `Collaborative session: ${session.request.prompt}\nResult: ${session.output.content.substring(0, 500)}...`;
-        await this.vectorDB.addDocument(
+        await this.memoryOrchestrator.addDocument(
           `session_${session.id}`,
           sessionSummary,
           {
@@ -702,7 +702,7 @@ export class CollaborativeSessionManager extends EventEmitter {
         );
       }
     } catch (error) {
-      logger.warn(`Failed to store session ${session.id} in VectorDB:`, error);
+      logger.warn(`Failed to store session ${session.id} in memory fabric:`, error);
       // Don't throw - this is not critical for session completion
     }
   }
@@ -775,7 +775,7 @@ export class CollaborativeSessionManager extends EventEmitter {
     
     // Store results in vector DB
     session.output = output; // Set the output first
-    await this.storeSessionInVectorDB(session);
+    await this.storeSessionInMemory(session);
     
     logger.info(`✅ Completed collaborative session ${sessionId}`);
     this.emit('session_completed', { sessionId, output });

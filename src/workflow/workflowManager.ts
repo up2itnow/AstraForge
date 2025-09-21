@@ -11,7 +11,7 @@
 
 import * as vscode from 'vscode';
 import { LLMManager } from '../llm/llmManager';
-import { VectorDB } from '../db/vectorDB';
+import { MemoryOrchestrator } from '../db/memoryOrchestrator';
 import { GitManager } from '../git/gitManager';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
@@ -74,13 +74,13 @@ export class WorkflowManager {
    * Initialize the WorkflowManager with required dependencies
    *
    * @param llmManager - Manager for LLM provider interactions
-   * @param vectorDB - Vector database for context storage and retrieval
+   * @param memoryOrchestrator - Unified memory fabric orchestrator
    * @param gitManager - Git integration for version control
    */
   constructor(
     private llmManager: LLMManager,
-    private vectorDB: VectorDB,
-  private gitManager: GitManager
+    private memoryOrchestrator: MemoryOrchestrator,
+    private gitManager: GitManager
   ) {
     this.workflowRL = new AdaptiveWorkflowRL();
     this.workspaceId = `workspace_${Date.now()}`;
@@ -95,38 +95,38 @@ export class WorkflowManager {
     this.initializeCollaboration();
   }
 
-  /** Tracks whether the vector database has been initialized */
-  private vectorInitialized = false;
+  /** Tracks whether the memory orchestrator has been initialized */
+  private memoryInitialized = false;
 
   /** Shared initialization promise to prevent duplicate init calls */
-  private vectorInitPromise?: Promise<void>;
+  private memoryInitPromise?: Promise<void>;
 
   /**
    * Ensure the vector database is initialized before use
    */
-  private async ensureVectorReady(): Promise<void> {
-    if (this.vectorInitialized) {
+  private async ensureMemoryReady(): Promise<void> {
+    if (this.memoryInitialized) {
       return;
     }
 
-    if (!this.vectorInitPromise) {
-      this.vectorInitPromise = (async () => {
+    if (!this.memoryInitPromise) {
+      this.memoryInitPromise = (async () => {
         try {
-          await this.vectorDB.init();
-          this.vectorInitialized = true;
+          await this.memoryOrchestrator.init();
+          this.memoryInitialized = true;
         } catch (error) {
-          console.error('Vector DB initialization failed:', error);
+          console.error('Memory orchestration initialization failed:', error);
           throw error;
         }
       })();
     }
 
     try {
-      await this.vectorInitPromise;
+      await this.memoryInitPromise;
     } catch (error) {
       // Allow retries on subsequent calls if initialization failed
-      this.vectorInitialized = false;
-      // Do not reset vectorInitPromise to undefined to prevent race conditions
+      this.memoryInitialized = false;
+      // Do not reset memoryInitPromise to undefined to prevent race conditions
       throw error;
     }
   }
@@ -180,10 +180,13 @@ export class WorkflowManager {
         }
       }
 
-      // Store in vector DB
-      await this.ensureVectorReady();
-      const embedding = await this.vectorDB.getEmbedding(this.buildPlan);
-      await this.vectorDB.addEmbedding('buildPlan', embedding, { plan: this.buildPlan });
+      // Store plan in memory fabric
+      await this.ensureMemoryReady();
+      const embedding = await this.memoryOrchestrator.getEmbedding(this.buildPlan);
+      await this.memoryOrchestrator.addEmbedding('buildPlan', embedding, {
+        plan: this.buildPlan,
+        scope: 'workspace'
+      });
 
       vscode.window.showInformationMessage('Build Plan ready! Proceeding to phases.');
       await this.executePhase();
@@ -218,11 +221,11 @@ export class WorkflowManager {
         projectIdea: this.projectIdea,
       });
 
-      // Enhanced context retrieval using vector DB
+      // Enhanced context retrieval using memory orchestrator
       const contextQuery = `${phase} for ${this.projectIdea}`;
-      await this.ensureVectorReady();
-      const contextEmbedding = await this.vectorDB.getEmbedding(contextQuery);
-      const relevantContext = await this.vectorDB.queryEmbedding(contextEmbedding, 3);
+      await this.ensureMemoryReady();
+      const contextEmbedding = await this.memoryOrchestrator.getEmbedding(contextQuery);
+      const relevantContext = await this.memoryOrchestrator.queryEmbedding(contextEmbedding, 3);
 
       const contextText = relevantContext
         .map(item => item.metadata)
@@ -517,10 +520,18 @@ export class WorkflowManager {
       projectIdea: this.projectIdea,
     };
 
-    const embedding = await this.vectorDB.getEmbedding(
+    const embedding = await this.memoryOrchestrator.getEmbedding(
       `${phase} ${this.projectIdea} ${output.substring(0, 500)}`
     );
-    await this.vectorDB.addEmbedding(`phase_${phase}_${Date.now()}`, embedding, contextData);
+    await this.memoryOrchestrator.addEmbedding(
+      `phase_${phase}_${Date.now()}`,
+      embedding,
+      {
+        ...contextData,
+        lineageSource: `workflow:${this.workspaceId}`,
+        phase,
+      }
+    );
   }
 
   private async handlePhaseError(error: any, phase: string): Promise<void> {

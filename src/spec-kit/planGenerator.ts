@@ -1,5 +1,5 @@
 import { LLMManager } from '../llm/llmManager';
-import { VectorDB } from '../db/vectorDB';
+import { MemoryOrchestrator } from '../db/memoryOrchestrator';
 import { GeneratedSpec } from './specGenerator';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -85,12 +85,12 @@ export interface DesignPhase {
 
 export class PlanGenerator {
   private llmManager: LLMManager;
-  private vectorDB: VectorDB;
+  private memoryOrchestrator: MemoryOrchestrator;
   private planTemplate: string = '';
 
-  constructor(llmManager: LLMManager, vectorDB: VectorDB) {
+  constructor(llmManager: LLMManager, memoryOrchestrator: MemoryOrchestrator) {
     this.llmManager = llmManager;
-    this.vectorDB = vectorDB;
+    this.memoryOrchestrator = memoryOrchestrator;
     this.loadPlanTemplate();
   }
 
