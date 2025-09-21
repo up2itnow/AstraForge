@@ -10,6 +10,7 @@ let llmManager: any;
 let vectorDB: any;
 let workflowManager: any;
 let gitManager: any;
+let specKitManager: any;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('AstraForge IDE activated! Launching into the stratosphere...');
@@ -60,6 +61,32 @@ async function registerProviders(context: vscode.ExtensionContext) {
       resolveWebviewView: async (webviewView, context, token) => {
         const provider = await getProjectIgnition();
         return provider.resolveWebviewView(webviewView, context, token);
+      },
+    })
+  );
+
+  let specTelemetry: any;
+  const getSpecTelemetry = async () => {
+    await Promise.all([ensureWorkflowManager(context), ensureSpecKitManager(context)]);
+
+    if (!specTelemetry) {
+      const { SpecTelemetryDashboardProvider } = await import('./providers/specTelemetryDashboard');
+      specTelemetry = new SpecTelemetryDashboardProvider(
+        context.extensionUri,
+        specKitManager,
+        gitManager,
+        workflowManager
+      );
+    }
+
+    return specTelemetry;
+  };
+
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('astraforge.specTelemetry', {
+      resolveWebviewView: async (webviewView, viewContext, token) => {
+        const provider = await getSpecTelemetry();
+        return provider.resolveWebviewView(webviewView, viewContext, token);
       },
     })
   );
@@ -176,6 +203,17 @@ async function ensureWorkflowManager(context: vscode.ExtensionContext) {
     workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
   }
   return workflowManager;
+}
+
+async function ensureSpecKitManager(context: vscode.ExtensionContext) {
+  if (!specKitManager) {
+    await Promise.all([ensureLLMManager(), ensureVectorDB(context), ensureGitManager()]);
+
+    const { SpecKitManager } = await import('./spec-kit/specKitManager');
+    specKitManager = new SpecKitManager(llmManager, vectorDB, gitManager);
+  }
+
+  return specKitManager;
 }
 
 export function deactivate() {

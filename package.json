@@ -25,6 +25,10 @@
         {
           "id": "astraforge.apiTester",
           "name": "API Tester"
+        },
+        {
+          "id": "astraforge.specTelemetry",
+          "name": "Spec Telemetry"
         }
       ]
     },

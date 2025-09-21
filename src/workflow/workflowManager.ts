@@ -15,6 +15,7 @@ import { VectorDB } from '../db/vectorDB';
 import { GitManager } from '../git/gitManager';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
+import { SpecSyncReport } from './specSync';
 import * as path from 'path';
 
 /**
@@ -298,6 +299,45 @@ export class WorkflowManager {
     }
   }
 
+  public getActivePhase(): string {
+    if (this.currentPhase < this.phases.length) {
+      return this.phases[this.currentPhase];
+    }
+
+    return this.phases[this.phases.length - 1];
+  }
+
+  public ingestSpecDeviations(report: SpecSyncReport): void {
+    if (!report.deviations || report.deviations.length === 0) {
+      return;
+    }
+
+    const currentState = this.getCurrentWorkflowState();
+    const penalty = report.deviations.reduce((sum, deviation) => {
+      return sum + this.calculateDeviationPenalty(deviation.severity);
+    }, 0);
+
+    const correctiveAction = {
+      type: 'optimize' as const,
+      confidence: Math.min(1, Math.abs(penalty)),
+    };
+
+    const nextState = {
+      ...currentState,
+      errorRate: Math.min(1, currentState.errorRate + report.deviations.length * 0.05),
+    };
+
+    this.workflowRL.updateQValue(currentState, correctiveAction, penalty, nextState);
+
+    this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'spec_sync_deviation', {
+      workflowId: report.workflowId,
+      featureName: report.featureName,
+      deviations: report.deviations,
+      progress: report.progress,
+      timestamp: Date.now(),
+    });
+  }
+
   // Supporting methods for enhanced workflow
 
   private async initializeCollaboration(): Promise<void> {
@@ -368,6 +408,17 @@ export class WorkflowManager {
 
       default:
         return { shouldReturn: false };
+    }
+  }
+
+  private calculateDeviationPenalty(severity: 'info' | 'warning' | 'critical'): number {
+    switch (severity) {
+      case 'critical':
+        return -0.7;
+      case 'warning':
+        return -0.3;
+      default:
+        return -0.1;
     }
   }
 
