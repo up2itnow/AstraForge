@@ -1,4 +1,0 @@
-Created: astraforge-ide\src/extension.ts
-Created: astraforge-ide\src/providers/setupWizard.ts
-Created: astraforge-ide\media/setup.js
-Created: astraforge-ide\src/providers/projectIgnition.ts

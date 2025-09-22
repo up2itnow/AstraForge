@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { LLMConfig, LLMProvider, LLMResponse, VoteResult, ConferenceResult } from './interfaces';
+import { LLMConfig, LLMProvider, _LLMResponse, _VoteResult, _ConferenceResult } from './interfaces';
 import { createProvider } from './providers';
 import { LLMCache } from './cache';
 
@@ -297,5 +297,18 @@ Respond with ONLY the option you choose, exactly as written.`;
    */
   clearCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Generate response from a specific provider (alias for queryLLM for compatibility)
+   */
+  async generateResponse(provider: string, prompt: string): Promise<string> {
+    // Find the index of the provider in the panel
+    const providerIndex = this.panel.findIndex(p => p.provider.toLowerCase() === provider.toLowerCase());
+    if (providerIndex === -1) {
+      // Default to first available provider
+      return this.queryLLM(0, prompt);
+    }
+    return this.queryLLM(providerIndex, prompt);
   }
 }

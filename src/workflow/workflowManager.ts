@@ -15,6 +15,8 @@ import { VectorDB } from '../db/vectorDB';
 import { GitManager } from '../git/gitManager';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
+import { MetaLearningIntegration, createMetaLearningSystem } from '../meta-learning';
+import { EmergentBehaviorSystem } from '../emergent-behavior';
 import * as path from 'path';
 
 /**
@@ -70,20 +72,29 @@ export class WorkflowManager {
   /** Unique identifier for this workspace session */
   private workspaceId: string;
 
+  /** Meta-learning integration for recursive self-improvement */
+  private metaLearning?: MetaLearningIntegration;
+
+  /** Emergent behavior system for breakthrough detection */
+  private emergentBehaviorSystem?: EmergentBehaviorSystem;
+
   /**
    * Initialize the WorkflowManager with required dependencies
    *
    * @param llmManager - Manager for LLM provider interactions
    * @param vectorDB - Vector database for context storage and retrieval
    * @param gitManager - Git integration for version control
+   * @param emergentBehaviorSystem - System for emergent behavior detection
    */
   constructor(
     private llmManager: LLMManager,
     private vectorDB: VectorDB,
-    private gitManager: GitManager
+    private gitManager: GitManager,
+    emergentBehaviorSystem?: EmergentBehaviorSystem
   ) {
     this.workflowRL = new AdaptiveWorkflowRL();
     this.workspaceId = `workspace_${Date.now()}`;
+    this.emergentBehaviorSystem = emergentBehaviorSystem;
     this.metrics = {
       startTime: Date.now(),
       phaseStartTime: Date.now(),
@@ -93,6 +104,17 @@ export class WorkflowManager {
     };
 
     this.initializeCollaboration();
+    this.initializeMetaLearning();
+    this.initializeEmergentBehavior();
+  }
+
+  /**
+   * Initialize emergent behavior system integration
+   */
+  private initializeEmergentBehavior(): void {
+    if (this.emergentBehaviorSystem) {
+      console.log('🧬 Emergent behavior system integrated with workflow manager');
+    }
   }
 
   /**
@@ -114,9 +136,40 @@ export class WorkflowManager {
     this.currentPhase = 0;
 
     try {
-      let prompt = idea;
+      // Get optimal strategy from meta-learning
+      const optimalStrategy = this.metaLearning?.getOptimalStrategy(
+        this.categorizeProjectType(idea),
+        this.estimateComplexity(idea)
+      );
+
+      if (optimalStrategy) {
+        console.log(`🧠 Using meta-learning optimized strategy: ${optimalStrategy.name}`);
+        // Apply strategy configuration to LLM manager
+        // This would configure agent count, rounds, etc.
+      }
+
+      // Enhance project idea with emergent behavior insights from vector context
+      let enhancedIdea = idea;
+      try {
+        const contextualInsights = await this.vectorDB.getContextualInsights(idea, {
+          domain: this.extractDomain(idea),
+          complexity: this.estimateComplexity(idea),
+          requiredInnovation: this.isInnovativeProject(idea),
+          behaviorPatterns: this.identifyBehaviorPatterns(idea)
+        });
+
+        if (contextualInsights.insights.dominantBehaviorType !== 'unknown') {
+          console.log(`🔍 Found contextual insights: ${contextualInsights.insights.dominantBehaviorType} pattern detected`);
+          enhancedIdea = `${idea} (Context: ${contextualInsights.insights.dominantBehaviorType}, Innovation: ${Math.round(contextualInsights.insights.averageInnovationIndex * 100)}%)`;
+        }
+      } catch (error) {
+        console.warn('Failed to get contextual insights:', error);
+        // Continue with original idea if contextual enhancement fails
+      }
+
+      let prompt = enhancedIdea;
       if (option === 'letPanelDecide') {
-        prompt = await this.llmManager.conference(`Refine this project idea: ${idea}`);
+        prompt = await this.llmManager.conference(`Refine this project idea: ${enhancedIdea}`);
       }
 
       // Step 2: Conferencing
@@ -264,11 +317,23 @@ export class WorkflowManager {
 
   private async initializeCollaboration(): Promise<void> {
     try {
-      this.collaborationServer = new CollaborationServer(3001);
+      // Use a random port between 3000-4000 to avoid conflicts in tests
+      const port = process.env.NODE_ENV === 'test' ? 0 : 3001;
+      this.collaborationServer = new CollaborationServer(port);
       await this.collaborationServer.start();
       console.log('Collaboration server initialized');
     } catch (error) {
       console.warn('Failed to start collaboration server:', error);
+    }
+  }
+
+  private initializeMetaLearning(): void {
+    try {
+      const metaLearningComponents = createMetaLearningSystem();
+      this.metaLearning = new MetaLearningIntegration(metaLearningComponents);
+      console.log('🧠 Meta-learning system initialized');
+    } catch (error) {
+      console.warn('Failed to initialize meta-learning system:', error);
     }
   }
 
@@ -574,6 +639,29 @@ ${bonuses}
         await vscode.window.showTextDocument(doc);
       }
 
+      // Record project completion in meta-learning system
+      const projectType = this.categorizeProjectType(this.projectIdea);
+      const complexity = this.estimateComplexity(this.projectIdea);
+
+      await this.metaLearning?.recordProjectAndAnalyze(
+        `project_${Date.now()}`,
+        projectType,
+        complexity,
+        this.extractTechnologies(this.projectIdea),
+        1, // teamSize (could be enhanced to track actual team size)
+        Math.round(totalTime / 1000 / 60), // duration in minutes
+        this.metrics.errors === 0, // success
+        this.calculateUserSatisfaction(), // aiCollaborationScore (using user satisfaction as proxy)
+        this.calculateUserSatisfaction(), // userSatisfaction
+        {
+          phasesCompleted: this.currentPhase,
+          iterations: this.metrics.iterations,
+          errors: this.metrics.errors,
+          rlStats,
+          buildPlan: this.buildPlan
+        }
+      );
+
       // Notify collaboration server
       this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'project_completed', {
         projectIdea: this.projectIdea,
@@ -582,6 +670,173 @@ ${bonuses}
       });
     } catch (error: any) {
       vscode.window.showErrorMessage(`Project completion failed: ${error.message}`);
+    }
+  }
+
+  // Meta-learning helper methods
+
+  private categorizeProjectType(idea: string): string {
+    return this.determineProjectType(idea.toLowerCase());
+  }
+
+  private determineProjectType(lowerIdea: string): string {
+    const projectTypeMap: Record<string, string> = {
+      'web': 'web',
+      'website': 'web',
+      'frontend': 'web',
+      'mobile': 'mobile',
+      'ios': 'mobile',
+      'android': 'mobile',
+      'backend': 'backend',
+      'api': 'backend',
+      'server': 'backend',
+      'ai': 'ai',
+      'machine learning': 'ai',
+      'neural': 'ai',
+      'blockchain': 'blockchain',
+      'crypto': 'blockchain',
+      'smart contract': 'blockchain',
+      'game': 'game',
+      'gaming': 'game',
+      'unity': 'game',
+      'desktop': 'desktop',
+      'electron': 'desktop',
+      'app': 'desktop'
+    };
+
+    for (const [keyword, type] of Object.entries(projectTypeMap)) {
+      if (lowerIdea.includes(keyword)) {
+        return type;
+      }
+    }
+
+    return 'fullstack'; // Default
+  }
+
+  private estimateComplexity(idea: string): number {
+    const lowerIdea = idea.toLowerCase();
+    let complexity = 0.1; // Base complexity
+
+    // Technology complexity factors
+    const complexityKeywords = {
+      high: ['machine learning', 'neural network', 'computer vision', 'natural language', 'blockchain', 'microservices', 'real-time', 'distributed', 'kubernetes', 'docker'],
+      medium: ['authentication', 'database', 'payment', 'websocket', 'api', 'integration', 'testing'],
+      low: ['static', 'simple', 'basic', 'crud', 'form']
+    };
+
+    for (const keyword of complexityKeywords.high) {
+      if (lowerIdea.includes(keyword)) complexity += 0.2;
+    }
+    for (const keyword of complexityKeywords.medium) {
+      if (lowerIdea.includes(keyword)) complexity += 0.1;
+    }
+    for (const keyword of complexityKeywords.low) {
+      if (lowerIdea.includes(keyword)) complexity -= 0.05;
+    }
+
+    // Length-based complexity
+    if (idea.length > 500) complexity += 0.1;
+    if (idea.length > 1000) complexity += 0.1;
+
+    // Technology stack complexity
+    const techCount = this.extractTechnologies(idea).length;
+    complexity += Math.min(techCount * 0.05, 0.2);
+
+    return Math.min(complexity, 1.0); // Cap at 1.0
+  }
+
+  private extractTechnologies(idea: string): string[] {
+    const lowerIdea = idea.toLowerCase();
+    const technologies: string[] = [];
+
+    const techMap: Record<string, string[]> = {
+      'react': ['react', 'jsx', 'next.js', 'remix', 'vite'],
+      'vue': ['vue', 'nuxt', 'vue.js'],
+      'angular': ['angular', 'ng'],
+      'nodejs': ['node', 'nodejs', 'express', 'fastify', 'koa'],
+      'python': ['python', 'django', 'flask', 'fastapi'],
+      'typescript': ['typescript', 'ts'],
+      'javascript': ['javascript', 'js'],
+      'database': ['mongodb', 'postgresql', 'mysql', 'redis', 'sqlite'],
+      'cloud': ['aws', 'azure', 'gcp', 'vercel', 'netlify'],
+      'mobile': ['react native', 'flutter', 'ios', 'android', 'swift', 'kotlin'],
+      'blockchain': ['ethereum', 'solidity', 'web3', 'smart contract'],
+      'ai': ['openai', 'gpt', 'claude', 'machine learning', 'tensorflow', 'pytorch']
+    };
+
+    for (const [tech, keywords] of Object.entries(techMap)) {
+      if (keywords.some(keyword => lowerIdea.includes(keyword))) {
+        technologies.push(tech);
+      }
+    }
+
+    return technologies;
+  }
+
+  // Enhanced vector context helper methods
+  private extractDomain(idea: string): string {
+    return this.getDomainFromIdea(idea.toLowerCase());
+  }
+
+  private getDomainFromIdea(lowerIdea: string): string {
+    const domainMap: Record<string, string> = {
+      'web': 'Web Development',
+      'frontend': 'Web Development',
+      'react': 'Web Development',
+      'mobile': 'Mobile Development',
+      'ios': 'Mobile Development',
+      'android': 'Mobile Development',
+      'ai': 'AI/ML',
+      'machine learning': 'AI/ML',
+      'blockchain': 'Blockchain',
+      'crypto': 'Blockchain',
+      'game': 'Game Development',
+      'gaming': 'Game Development',
+      'data': 'Data Science',
+      'database': 'Data Science'
+    };
+
+    for (const [keyword, domain] of Object.entries(domainMap)) {
+      if (lowerIdea.includes(keyword)) {
+        return domain;
+      }
+    }
+
+    return 'General Development';
+  }
+
+  private isInnovativeProject(idea: string): boolean {
+    const lowerIdea = idea.toLowerCase();
+    const innovationKeywords = [
+      'innovative', 'novel', 'creative', 'breakthrough', 'revolutionary',
+      'unique', 'original', 'pioneering', 'groundbreaking', 'transformative',
+      'cutting-edge', 'next-generation', 'disruptive'
+    ];
+
+    return innovationKeywords.some(keyword => lowerIdea.includes(keyword));
+  }
+
+  private identifyBehaviorPatterns(idea: string): string[] {
+    return this.analyzeBehaviorPatterns(idea.toLowerCase());
+  }
+
+  private analyzeBehaviorPatterns(lowerIdea: string): string[] {
+    const patterns: string[] = [];
+
+    this.addPatternIfMatches(patterns, lowerIdea, ['collaborative', 'team', 'multi-user'], 'collaboration');
+    this.addPatternIfMatches(patterns, lowerIdea, ['optimization', 'performance', 'efficient'], 'optimization');
+    this.addPatternIfMatches(patterns, lowerIdea, ['adaptive', 'learning', 'intelligent'], 'adaptation');
+
+    if (this.isInnovativeProject(lowerIdea)) {
+      patterns.push('innovation');
+    }
+
+    return patterns.length > 0 ? patterns : ['collaboration']; // Default to collaboration
+  }
+
+  private addPatternIfMatches(patterns: string[], content: string, keywords: string[], patternName: string): void {
+    if (keywords.some(keyword => content.includes(keyword))) {
+      patterns.push(patternName);
     }
   }
 }

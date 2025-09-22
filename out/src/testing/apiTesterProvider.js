@@ -1,18 +1,15 @@
 import * as vscode from 'vscode';
 import { ApiTesterCore } from './apiTesterCore';
-import { envLoader } from '../utils/envLoader';
 export class ApiTesterProvider {
-    constructor(_extensionUri, _context) {
+    constructor(_extensionUri) {
         this._extensionUri = _extensionUri;
-        this._context = _context;
         this._tester = new ApiTesterCore();
-        this._secretStorage = _context?.secrets;
     }
     resolveWebviewView(webviewView, _context, _token) {
         this._view = webviewView.webview;
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this._extensionUri]
+            localResourceRoots: [this._extensionUri],
         };
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
         // Handle messages from the webview
@@ -35,43 +32,13 @@ export class ApiTesterProvider {
                     case 'testWorkflow':
                         await this._handleWorkflowTest(data);
                         break;
-                    case 'testConference':
-                        await this._handleConferenceTest(data);
-                        break;
                     case 'validateKey':
-                        if (data.realValidation) {
-                            const result = await this._tester.validateApiKeyWithCall(data.provider, data.key);
-                            this._sendMessage('keyValidated', {
-                                isValid: result.valid,
-                                provider: data.provider,
-                                error: result.error
-                            });
-                        }
-                        else {
-                            const isValid = this._tester.validateApiKey(data.provider, data.key);
-                            this._sendMessage('keyValidated', { isValid, provider: data.provider });
-                        }
-                        break;
-                    case 'storeKey':
-                        if (this._secretStorage && data.key) {
-                            await this._secretStorage.store(`astraforge.${data.provider.toLowerCase()}.key`, data.key);
-                            this._sendMessage('keyStored', { provider: data.provider, success: true });
-                        }
-                        break;
-                    case 'retrieveKey':
-                        if (this._secretStorage) {
-                            const key = await this._secretStorage.get(`astraforge.${data.provider.toLowerCase()}.key`);
-                            this._sendMessage('keyRetrieved', { provider: data.provider, key: key || '' });
-                        }
+                        const isValid = this._tester.validateApiKey(data.provider, data.key);
+                        this._sendMessage('keyValidated', { isValid, provider: data.provider });
                         break;
                     case 'getProviders':
                         const providers = this._tester.getSupportedProviders();
-                        const envConfig = {
-                            hasApiKey: !!envLoader.getOpenRouterApiKey(),
-                            models: envLoader.getOpenRouterModels(),
-                            defaultProvider: 'OpenRouter'
-                        };
-                        this._sendMessage('providersList', { providers, envConfig });
+                        this._sendMessage('providersList', { providers });
                         break;
                     case 'getModels':
                         const models = this._tester.getSupportedModels(data.provider);
@@ -84,7 +51,7 @@ export class ApiTesterProvider {
             catch (error) {
                 this._sendMessage('error', {
                     message: error.message,
-                    type: data.type
+                    type: data.type,
                 });
             }
         });
@@ -93,56 +60,28 @@ export class ApiTesterProvider {
         const result = await this._tester.testLLM(data.provider, data.apiKey, data.model, data.prompt);
         this._sendMessage('llmTestResult', {
             result,
-            requestId: data.requestId
+            requestId: data.requestId,
         });
     }
     async _handleBatchTest(data) {
         const result = await this._tester.testBatchLLM(data.provider, data.apiKey, data.model, data.prompts);
         this._sendMessage('batchTestResult', {
             result,
-            requestId: data.requestId
+            requestId: data.requestId,
         });
     }
     async _handleVectorTest(data) {
         const result = await this._tester.testVectorQuery(data.query, data.topK || 5);
         this._sendMessage('vectorTestResult', {
             result,
-            requestId: data.requestId
+            requestId: data.requestId,
         });
     }
     async _handleWorkflowTest(data) {
         const results = await this._tester.testWorkflowSimulation(data.idea, data.provider, data.apiKey, data.model);
         this._sendMessage('workflowTestResult', {
             results,
-            requestId: data.requestId
-        });
-    }
-    async _handleConferenceTest(data) {
-        // Configure 3-LLM panel with roles
-        const providers = [
-            {
-                provider: data.provider,
-                apiKey: data.apiKey,
-                model: 'anthropic/claude-3-opus',
-                role: 'concept'
-            },
-            {
-                provider: data.provider,
-                apiKey: data.apiKey,
-                model: 'openai/gpt-4-turbo',
-                role: 'development'
-            },
-            {
-                provider: data.provider,
-                apiKey: data.apiKey,
-                model: 'xai/grok-beta',
-                role: 'coding'
-            }
-        ];
-        const result = await this._tester.testConference(data.idea, providers, data.rounds || 2, data.budget || 10.0);
-        this._sendMessage('conferenceTestResult', {
-            result,
-            requestId: data.requestId
+            requestId: data.requestId,
         });
     }
     _sendMessage(type, data) {
@@ -249,12 +188,7 @@ export class ApiTesterProvider {
     <div class="form-group">
       <label for="apiKey">API Key:</label>
       <input type="password" id="apiKey" placeholder="Enter your API key">
-      <div class="button-group">
-        <button class="btn btn-secondary" onclick="validateKey(false)">Quick Validate</button>
-        <button class="btn btn-secondary" onclick="validateKey(true)">Real Validate</button>
-        <button class="btn btn-secondary" onclick="storeKey()">Store Key</button>
-        <button class="btn btn-secondary" onclick="loadKey()">Load Key</button>
-      </div>
+      <button class="btn btn-secondary" onclick="validateKey()">Validate Key</button>
     </div>
 
     <div class="form-group">
@@ -267,25 +201,14 @@ export class ApiTesterProvider {
     </div>
 
     <div class="form-group">
-      <label for="prompt">Test Prompt/Idea:</label>
-      <textarea id="prompt" placeholder="Enter your test prompt or project idea here..."></textarea>
-    </div>
-
-    <div class="form-group">
-      <label for="budget">Budget Limit ($):</label>
-      <input type="number" id="budget" value="10" step="0.01" min="0.01">
-    </div>
-
-    <div class="form-group">
-      <label for="rounds">Conference Rounds:</label>
-      <input type="number" id="rounds" value="2" min="1" max="5">
+      <label for="prompt">Test Prompt:</label>
+      <textarea id="prompt" placeholder="Enter your test prompt here..."></textarea>
     </div>
 
     <div class="button-group">
       <button class="btn btn-primary" onclick="testLLM()">Test LLM</button>
       <button class="btn btn-secondary" onclick="testVector()">Test Vector</button>
       <button class="btn btn-secondary" onclick="testWorkflow()">Test Workflow</button>
-      <button class="btn btn-primary" onclick="testConference()">Test Conference</button>
       <button class="btn btn-secondary" onclick="clearResults()">Clear</button>
     </div>
 

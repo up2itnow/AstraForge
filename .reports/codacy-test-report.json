@@ -1,0 +1,46 @@
+{
+  "timestamp": "2025-09-21T19:47:42.149Z",
+  "overall": {
+    "passed": false,
+    "score": 73,
+    "totalIssues": 12
+  },
+  "tools": [
+    {
+      "tool": "ESLint",
+      "passed": false,
+      "score": 30,
+      "issues": 1,
+      "details": "Command failed: npm run lint"
+    },
+    {
+      "tool": "Lizard",
+      "passed": true,
+      "score": 88,
+      "issues": 3,
+      "details": "Code complexity analysis completed"
+    },
+    {
+      "tool": "Semgrep",
+      "passed": false,
+      "score": 75,
+      "issues": 8,
+      "details": "Security pattern analysis completed"
+    },
+    {
+      "tool": "Trivy",
+      "passed": true,
+      "score": 100,
+      "issues": 0,
+      "details": "{\n  \"auditReportVersion\": 2,\n  \"vulnerabilities\": {},\n  \"metadata\": {\n    \"vulnerabilities\": {\n      \"info\": 0,\n      \"low\": 0,\n      \"moderate\": 0,\n      \"high\": 0,\n      \"critical\": 0,\n      \"total\": 0\n    },\n    \"dependencies\": {\n      \"prod\": 120,\n      \"dev\": 1073,\n      \"optional\": 67,\n      \"peer\": 437,\n      \"peerOptional\": 0,\n      \"total\": 1192\n    }\n  }\n}\n"
+    }
+  ],
+  "recommendations": [
+    "Fix ESLint errors and warnings",
+    "Review coding standards and style guidelines",
+    "Consider running ESLint with --fix flag",
+    "Address identified security vulnerabilities",
+    "Review security best practices",
+    "Consider security code review"
+  ]
+}

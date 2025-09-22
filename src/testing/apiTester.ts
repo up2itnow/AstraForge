@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { ApiTesterCore, TestResult, BatchTestResult, VectorTestResult } from './apiTesterCore.js';
+import { ApiTesterCore, _TestResult, _BatchTestResult, _VectorTestResult } from './apiTesterCore.js';
 import * as fs from 'fs';
-import * as path from 'path';
+import * as _path from 'path';
 
 const program = new Command();
 const tester = new ApiTesterCore();

@@ -243,5 +243,17 @@ Respond with ONLY the option you choose, exactly as written.`;
     clearCache() {
         this.cache.clear();
     }
+    /**
+     * Generate response from a specific provider (alias for queryLLM for compatibility)
+     */
+    async generateResponse(provider, prompt) {
+        // Find the index of the provider in the panel
+        const providerIndex = this.panel.findIndex(p => p.provider.toLowerCase() === provider.toLowerCase());
+        if (providerIndex === -1) {
+            // Default to first available provider
+            return this.queryLLM(0, prompt);
+        }
+        return this.queryLLM(providerIndex, prompt);
+    }
 }
 //# sourceMappingURL=llmManager.js.map

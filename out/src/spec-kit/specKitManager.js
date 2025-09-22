@@ -4,6 +4,7 @@ import * as path from 'path';
 import { SpecGenerator } from './specGenerator';
 import { PlanGenerator } from './planGenerator';
 import { TaskGenerator } from './taskGenerator';
+import { logger } from '../utils/logger';
 export class SpecKitManager {
     constructor(llmManager, vectorDB, gitManager) {
         this.workflows = new Map();
@@ -29,7 +30,7 @@ export class SpecKitManager {
         };
     }
     async initializeSpecKit(workspaceDir) {
-        console.log('🌱 Initializing Spec Kit structure...');
+        logger.info('Initializing Spec Kit...');
         const specsDir = path.join(workspaceDir, 'specs');
         const templatesDir = path.join(workspaceDir, 'templates');
         const scriptsDir = path.join(workspaceDir, 'scripts');
@@ -50,7 +51,7 @@ export class SpecKitManager {
         vscode.window.showInformationMessage('✅ Spec Kit initialized successfully!');
     }
     async createSpecification(request) {
-        console.log('📝 Creating specification for:', request.userIdea);
+        logger.info('SpecKit: createSpecification');
         // Generate specification
         const spec = await this.specGenerator.generateSpecification(request);
         // Create workflow
@@ -87,11 +88,11 @@ export class SpecKitManager {
         return workflowId;
     }
     async createImplementationPlan(workflowId, technicalRequirements) {
+        logger.info('SpecKit: createImplementationPlan');
         const workflow = this.workflows.get(workflowId);
         if (!workflow || !workflow.spec) {
             throw new Error('Workflow or specification not found');
         }
-        console.log('🔧 Creating implementation plan for:', workflow.featureName);
         // Generate technical plan
         const plan = await this.planGenerator.generatePlan(workflow.spec, technicalRequirements);
         // Execute research tasks
@@ -131,11 +132,11 @@ export class SpecKitManager {
         await this.showPlanResults(workflow);
     }
     async generateTasks(workflowId) {
+        logger.info('SpecKit: generateTasks');
         const workflow = this.workflows.get(workflowId);
         if (!workflow || !workflow.plan) {
             throw new Error('Workflow or plan not found');
         }
-        console.log('📋 Generating tasks for:', workflow.featureName);
         // Generate task list
         const taskList = await this.taskGenerator.generateTasks(workflow.plan);
         // Validate tasks
@@ -171,7 +172,6 @@ export class SpecKitManager {
         if (!workflow || !workflow.spec) {
             throw new Error('Workflow or specification not found');
         }
-        console.log('🔄 Refining specification for:', workflow.featureName);
         // Refine specification
         const refinedSpec = await this.specGenerator.refineSpecification(workflow.spec.content, refinements);
         // Update workflow

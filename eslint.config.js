@@ -18,7 +18,12 @@ export default [
       complexity: ['error', 10],
       'max-lines-per-function': ['warn', 50],
       'no-console': 'warn',
-      '@typescript-eslint/no-unused-vars': 'off', // Temporarily disabled for interface requirements
+      'no-unused-vars': 'off', // Turn off base rule, handled by TypeScript version
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_'
+      }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-undef': 'off', // TypeScript handles this
     },

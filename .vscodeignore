@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Development files
+.vscode/
+.git/
+.gitignore
+README.md
+CHANGELOG.md
+
+# Build outputs
+out/
+dist/
+coverage/
+.nyc_output
+
+# Test files
+tests/
+__tests__/
+*.test.ts
+*.test.js
+jest.config.js
+tsconfig.json
+
+# Development scripts and configs
+scripts/
+eslint.config.js
+launch_extension.ps1
+
+# Documentation
+docs/
+archive/
+temp_folder/
+test_invalid/
+
+# Other development files
+example.env
+extraction_log.txt
+test_prompts.txt
+tatus
+
+# Temporary files
+*.log
+*.tmp
+temp/
+
+# Package files
+package-lock.json
+LICENSE

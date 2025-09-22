@@ -22,6 +22,16 @@ export interface LLMResponse {
   metadata?: Record<string, any>;
 }
 
+export interface _LLMResponse {
+  content: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  metadata?: Record<string, any>;
+}
+
 export interface LLMProvider {
   /**
    * Query the LLM with a prompt
@@ -53,6 +63,18 @@ export interface VoteResult {
 }
 
 export interface ConferenceResult {
+  finalResult: string;
+  discussionHistory: string[];
+  consensus: number; // 0-1 scale
+}
+
+export interface _VoteResult {
+  option: string;
+  votes: number;
+  confidence: number;
+}
+
+export interface _ConferenceResult {
   finalResult: string;
   discussionHistory: string[];
   consensus: number; // 0-1 scale

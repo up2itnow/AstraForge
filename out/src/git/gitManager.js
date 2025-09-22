@@ -20,46 +20,6 @@ export class GitManager {
             }
         }
     }
-    async addAndCommit(files, message) {
-        if (!this.workspacePath) {
-            vscode.window.showWarningMessage('Git workspace not initialized');
-            return;
-        }
-        try {
-            // Add specific files or directories
-            for (const file of files) {
-                await execAsync(`git add "${file}"`, { cwd: this.workspacePath });
-            }
-            // Check if there are changes to commit
-            const { stdout: status } = await execAsync('git status --porcelain', { cwd: this.workspacePath });
-            if (status.trim()) {
-                // There are changes to commit
-                await execAsync(`git commit -m "${message}"`, { cwd: this.workspacePath });
-                vscode.window.showInformationMessage(`Committed: ${message}`);
-            }
-            else {
-                vscode.window.showInformationMessage('No changes to commit');
-            }
-        }
-        catch (error) {
-            // Handle case where git user is not configured
-            if (error.message.includes('user.email') || error.message.includes('user.name')) {
-                try {
-                    await execAsync('git config user.email "astraforge@example.com"', { cwd: this.workspacePath });
-                    await execAsync('git config user.name "AstraForge"', { cwd: this.workspacePath });
-                    // Retry commit
-                    await execAsync(`git commit -m "${message}"`, { cwd: this.workspacePath });
-                    vscode.window.showInformationMessage(`Committed: ${message}`);
-                }
-                catch (retryError) {
-                    vscode.window.showErrorMessage(`Git commit failed: ${retryError.message}`);
-                }
-            }
-            else {
-                vscode.window.showErrorMessage(`Git commit failed: ${error.message}`);
-            }
-        }
-    }
     async commit(message) {
         if (!this.workspacePath) {
             vscode.window.showWarningMessage('Git workspace not initialized');
@@ -69,7 +29,9 @@ export class GitManager {
             // Add all changes
             await execAsync('git add .', { cwd: this.workspacePath });
             // Check if there are changes to commit
-            const { stdout: status } = await execAsync('git status --porcelain', { cwd: this.workspacePath });
+            const { stdout: status } = await execAsync('git status --porcelain', {
+                cwd: this.workspacePath,
+            });
             if (status.trim()) {
                 // There are changes to commit
                 await execAsync(`git commit -m "${message}"`, { cwd: this.workspacePath });
@@ -83,7 +45,9 @@ export class GitManager {
             // Handle case where git user is not configured
             if (error.message.includes('user.email') || error.message.includes('user.name')) {
                 try {
-                    await execAsync('git config user.email "astraforge@example.com"', { cwd: this.workspacePath });
+                    await execAsync('git config user.email "astraforge@example.com"', {
+                        cwd: this.workspacePath,
+                    });
                     await execAsync('git config user.name "AstraForge"', { cwd: this.workspacePath });
                     // Retry commit
                     await execAsync(`git commit -m "${message}"`, { cwd: this.workspacePath });
@@ -108,6 +72,50 @@ export class GitManager {
         }
         catch (error) {
             return `Git status failed: ${error.message}`;
+        }
+    }
+    async addAndCommit(files, message) {
+        if (!this.workspacePath) {
+            vscode.window.showWarningMessage('Git workspace not initialized');
+            return;
+        }
+        try {
+            // Add specific files or patterns
+            for (const file of files) {
+                await execAsync(`git add "${file}"`, { cwd: this.workspacePath });
+            }
+            // Check if there are changes to commit
+            const { stdout: status } = await execAsync('git status --porcelain', {
+                cwd: this.workspacePath,
+            });
+            if (status.trim()) {
+                // There are changes to commit
+                await execAsync(`git commit -m "${message}"`, { cwd: this.workspacePath });
+                vscode.window.showInformationMessage(`Committed: ${message}`);
+            }
+            else {
+                vscode.window.showInformationMessage('No changes to commit');
+            }
+        }
+        catch (error) {
+            // Handle case where git user is not configured
+            if (error.message.includes('user.email') || error.message.includes('user.name')) {
+                try {
+                    await execAsync('git config user.email "astraforge@example.com"', {
+                        cwd: this.workspacePath,
+                    });
+                    await execAsync('git config user.name "AstraForge"', { cwd: this.workspacePath });
+                    // Retry commit
+                    await execAsync(`git commit -m "${message}"`, { cwd: this.workspacePath });
+                    vscode.window.showInformationMessage(`Committed: ${message}`);
+                }
+                catch (retryError) {
+                    vscode.window.showErrorMessage(`Git commit failed: ${retryError.message}`);
+                }
+            }
+            else {
+                vscode.window.showErrorMessage(`Git commit failed: ${error.message}`);
+            }
         }
     }
 }

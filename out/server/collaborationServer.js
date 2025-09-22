@@ -27,11 +27,17 @@ export class CollaborationServer {
                     reject(error);
                 }
                 else {
+                    // Get the actual port assigned (in case port 0 was used)
+                    const actualPort = this.server.address().port || this.port;
+                    this.port = actualPort;
                     console.log(`Collaboration server started on port ${this.port}`);
                     resolve();
                 }
             });
         });
+    }
+    getPort() {
+        return this.port;
     }
     async stop() {
         return new Promise(resolve => {

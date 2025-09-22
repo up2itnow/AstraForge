@@ -5,6 +5,7 @@
  * graceful timeout handling, and configurable time limits for different
  * collaboration scenarios.
  */
+import { logger } from '../../utils/logger';
 export class TimeManager {
     constructor() {
         this.timers = new Map();
@@ -34,7 +35,7 @@ export class TimeManager {
             this.handleTimeout(timerId);
         }, duration);
         this.timers.set(timerId, timer);
-        console.log(`⏰ Timer ${timerId} started for ${duration}ms`);
+        logger.debug(`⏰ Timer ${timerId} started for ${duration}ms`);
         return timerId;
     }
     /**
@@ -43,7 +44,7 @@ export class TimeManager {
     stopTimer(timerId) {
         const timer = this.timers.get(timerId);
         if (!timer) {
-            console.warn(`Timer ${timerId} not found`);
+            logger.warn(`Timer ${timerId} not found`);
             return;
         }
         timer.isActive = false;
@@ -54,7 +55,7 @@ export class TimeManager {
         // Clear warning timers
         timer.warningHandles.forEach(handle => clearTimeout(handle));
         this.timers.delete(timerId);
-        console.log(`⏰ Timer ${timerId} stopped`);
+        logger.debug(`⏰ Timer ${timerId} stopped`);
     }
     /**
      * Get remaining time for a timer in milliseconds
@@ -114,7 +115,7 @@ export class TimeManager {
         timer.timeoutHandle = setTimeout(() => {
             this.handleTimeout(timerId);
         }, this.getRemainingTime(timerId));
-        console.log(`⏰ Timer ${timerId} extended by ${additionalTime}ms`);
+        logger.debug(`⏰ Timer ${timerId} extended by ${additionalTime}ms`);
         return true;
     }
     /**
@@ -141,7 +142,7 @@ export class TimeManager {
         expiredTimers.forEach(timerId => {
             this.timers.delete(timerId);
         });
-        console.log(`⏰ Cleaned up ${expiredTimers.length} expired timers`);
+        logger.debug(`⏰ Cleaned up ${expiredTimers.length} expired timers`);
     }
     /**
      * Set up warning timers based on thresholds
@@ -156,12 +157,12 @@ export class TimeManager {
                 if (timer.isActive && !timer.warningsSent[index]) {
                     timer.warningsSent[index] = true;
                     const remainingTime = this.getRemainingTime(timer.id);
-                    console.log(`⚠️ Timer ${timer.id} warning: ${remainingTime}ms remaining (${Math.round((1 - threshold) * 100)}% left)`);
+                    logger.warn(`⚠️ Timer ${timer.id} warning: ${remainingTime}ms remaining (${Math.round((1 - threshold) * 100)}% left)`);
                     try {
                         timer.callbacks.onWarning(remainingTime);
                     }
                     catch (error) {
-                        console.error(`Error in warning callback for timer ${timer.id}:`, error);
+                        logger.error(`Error in warning callback for timer ${timer.id}:`, error);
                     }
                 }
             }, warningTime);
@@ -177,14 +178,14 @@ export class TimeManager {
             return;
         }
         timer.isActive = false;
-        console.log(`⏰ Timer ${timerId} expired`);
+        logger.warn(`⏰ Timer ${timerId} expired`);
         // Call timeout callback if provided
         if (timer.callbacks?.onTimeout) {
             try {
                 timer.callbacks.onTimeout();
             }
             catch (error) {
-                console.error(`Error in timeout callback for timer ${timerId}:`, error);
+                logger.error(`Error in timeout callback for timer ${timerId}:`, error);
             }
         }
         // Clean up warning timers
@@ -198,13 +199,13 @@ export class TimeManager {
         const callbacks = {};
         if (onWarning) {
             callbacks.onWarning = (remaining) => {
-                console.log(`⚠️ Round ${roundType} time warning: ${Math.round(remaining / 1000)}s remaining`);
+                logger.warn(`⚠️ Round ${roundType} time warning: ${Math.round(remaining / 1000)}s remaining`);
                 onWarning(remaining);
             };
         }
         if (onTimeout) {
             callbacks.onTimeout = () => {
-                console.log(`⏰ Round ${roundType} timeout reached`);
+                logger.warn(`⏰ Round ${roundType} timeout reached`);
                 onTimeout();
             };
         }
@@ -217,13 +218,13 @@ export class TimeManager {
         const callbacks = {};
         if (onWarning) {
             callbacks.onWarning = (remaining) => {
-                console.log(`⚠️ Session ${sessionId} time warning: ${Math.round(remaining / 1000)}s remaining`);
+                logger.warn(`⚠️ Session ${sessionId} time warning: ${Math.round(remaining / 1000)}s remaining`);
                 onWarning(remaining);
             };
         }
         if (onTimeout) {
             callbacks.onTimeout = () => {
-                console.log(`⏰ Session ${sessionId} timeout - forcing consensus`);
+                logger.warn(`⏰ Session ${sessionId} timeout - forcing consensus`);
                 onTimeout();
             };
         }
@@ -233,7 +234,7 @@ export class TimeManager {
      * Dispose of all timers and clean up resources
      */
     dispose() {
-        console.log('⏰ TimeManager disposing all timers...');
+        logger.debug('⏰ TimeManager disposing all timers...');
         for (const [timerId] of this.timers) {
             this.stopTimer(timerId);
         }

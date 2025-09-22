@@ -1,5 +1,0 @@
-What is the capital of France?
-Explain quantum computing in simple terms
-Write a haiku about programming
-What are the benefits of TypeScript over JavaScript?
-How does machine learning work?

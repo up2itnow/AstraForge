@@ -7,31 +7,7 @@ import { LLMManager } from '../../src/llm/llmManager';
 import { VectorDB } from '../../src/db/vectorDB';
 import { CollaborationRequest } from '../../src/collaboration/types/collaborationTypes';
 import * as vscode from 'vscode';
-import * as dotenv from 'dotenv';
 import * as fs from 'fs';
-
-// Load environment variables
-dotenv.config();
-
-// Mock only vscode since we're not running in VS Code environment
-jest.mock('vscode', () => ({
-  workspace: {
-    getConfiguration: jest.fn(() => ({
-      get: jest.fn((key: string) => {
-        if (key === 'llmPanel') {
-          const models = process.env.OPENROUTER_MODELS_TO_USE?.split(',').map(model => model.trim()) || [];
-          return models.map((model, index) => ({
-            provider: 'OpenRouter',
-            key: process.env.OPENROUTER_API_KEY,
-            model: model,
-            role: index === 0 ? 'primary' : 'secondary'
-          }));
-        }
-        return [];
-      })
-    }))
-  }
-}));
 
 describe('CollaborativeSessionManager Integration', () => {
   let sessionManager: CollaborativeSessionManager;

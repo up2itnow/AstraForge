@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from '../utils/logger';
 export class PlanGenerator {
     constructor(llmManager, vectorDB) {
         this.planTemplate = '';
@@ -13,7 +14,7 @@ export class PlanGenerator {
             this.planTemplate = fs.readFileSync(templatePath, 'utf8');
         }
         catch (error) {
-            console.error('Failed to load plan template:', error);
+            logger.error('Failed to load plan template:', error);
             this.planTemplate = this.getDefaultPlanTemplate();
         }
     }
@@ -57,7 +58,7 @@ export class PlanGenerator {
 `;
     }
     async generatePlan(spec, technicalRequirements) {
-        console.log('🔧 Generating technical implementation plan...');
+        logger.info('🔧 Generating technical implementation plan...');
         // Phase 0: Research and technical context
         const technicalContext = await this.determineTechnicalContext(spec, technicalRequirements);
         const researchTasks = await this.generateResearchTasks(spec, technicalContext);
@@ -136,7 +137,7 @@ export class PlanGenerator {
             };
         }
         catch (error) {
-            console.error('Error determining technical context:', error);
+            logger.error('Error determining technical context:', error);
             return {
                 language: 'TypeScript 5.1',
                 primaryDependencies: ['Node.js', 'VS Code API'],
@@ -178,7 +179,7 @@ export class PlanGenerator {
             return JSON.parse(response);
         }
         catch (error) {
-            console.error('Error generating research tasks:', error);
+            logger.error('Error generating research tasks:', error);
             return [
                 {
                     id: 'R001',
@@ -233,7 +234,7 @@ export class PlanGenerator {
             return JSON.parse(response);
         }
         catch (error) {
-            console.error('Error performing constitution check:', error);
+            logger.error('Error performing constitution check:', error);
             return {
                 simplicity: {
                     projectCount: 1,
@@ -342,7 +343,7 @@ export class PlanGenerator {
             return JSON.parse(response);
         }
         catch (error) {
-            console.error('Error planning design phase:', error);
+            logger.error('Error planning design phase:', error);
             return {
                 dataModel: 'Data model to be defined based on key entities',
                 apiContracts: ['API contracts to be generated from functional requirements'],
@@ -373,7 +374,7 @@ export class PlanGenerator {
             return response;
         }
         catch (error) {
-            console.error('Error defining task planning approach:', error);
+            logger.error('Error defining task planning approach:', error);
             return `Task Generation Strategy:
 - Generate tasks from design documents (contracts, data model, quickstart)
 - Each contract → contract test task [P]
@@ -404,7 +405,7 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
             return response.trim();
         }
         catch (error) {
-            console.error('Error generating summary:', error);
+            logger.error('Error generating summary:', error);
             return `Implement ${spec.title} using ${context.language} with ${context.primaryDependencies.join(', ')} following test-driven development principles.`;
         }
     }
@@ -525,7 +526,7 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
 - [ ] Complexity deviations documented`;
     }
     async executeResearch(tasks) {
-        console.log('🔍 Executing research tasks...');
+        logger.info('🔍 Executing research tasks...');
         const completedTasks = await Promise.all(tasks.map(async (task) => {
             const prompt = `
         Research this topic:
@@ -550,7 +551,7 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
                 };
             }
             catch (error) {
-                console.error(`Error researching task ${task.id}:`, error);
+                logger.error(`Error researching task ${task.id}:`, error);
                 return {
                     ...task,
                     decision: 'Research pending - manual investigation required'

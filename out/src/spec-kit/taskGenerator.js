@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 export class TaskGenerator {
@@ -50,7 +51,7 @@ export class TaskGenerator {
 `;
     }
     async generateTasks(plan) {
-        console.log('📋 Generating task list from implementation plan...');
+        logger.info('Generating task list from implementation plan...');
         // Generate tasks by phase
         const setupTasks = await this.generateSetupTasks(plan);
         const testTasks = await this.generateTestTasks(plan);
@@ -87,6 +88,7 @@ export class TaskGenerator {
         };
     }
     async generateSetupTasks(plan) {
+        logger.info('Generating setup tasks...');
         const prompt = `
     Generate setup tasks for this technical plan:
     

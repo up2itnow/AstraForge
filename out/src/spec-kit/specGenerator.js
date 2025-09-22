@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 export class SpecGenerator {
@@ -64,7 +65,7 @@ export class SpecGenerator {
 `;
     }
     async generateSpecification(request) {
-        console.log('🌱 Generating specification from user idea...');
+        logger.info('Generating specification from user idea...');
         // Step 1: Parse and understand the user idea
         const parsedIdea = await this.parseUserIdea(request.userIdea, request.projectContext);
         // Step 2: Generate specification sections using multi-LLM collaboration
@@ -74,7 +75,7 @@ export class SpecGenerator {
         // Step 4: Identify clarification needs
         const clarifications = await this.identifyClarifications(specSections);
         // Step 5: Assemble the final specification
-        const finalSpec = this.assembleSpecification(specSections, clarifications);
+        const finalSpec = this.assembleSpecification(request, specSections, clarifications);
         return {
             title: specSections.featureName,
             content: finalSpec,
@@ -336,14 +337,14 @@ export class SpecGenerator {
             return [];
         }
     }
-    assembleSpecification(sections, clarifications) {
+    assembleSpecification(request, sections, clarifications) {
         const currentDate = new Date().toISOString().split('T')[0];
         let spec = this.specTemplate;
         // Replace template variables
         spec = spec.replace('{{FEATURE_NAME}}', sections.featureName || 'New Feature');
         spec = spec.replace('{{BRANCH_NAME}}', sections.branchName || '001-new-feature');
         spec = spec.replace('{{DATE}}', currentDate);
-        spec = spec.replace('{{USER_INPUT}}', sections.originalInput || 'User provided idea');
+        spec = spec.replace('{{USER_INPUT}}', request.userIdea || 'User provided idea');
         // Replace content sections
         spec = spec.replace('{{PRIMARY_USER_STORY}}', sections.userScenarios?.join('\n\n') || 'User story to be defined');
         spec = spec.replace('{{ACCEPTANCE_SCENARIOS}}', sections.acceptanceScenarios?.map((s, i) => `${i + 1}. ${s}`).join('\n') || 'Scenarios to be defined');
@@ -354,6 +355,7 @@ export class SpecGenerator {
         return spec;
     }
     async refineSpecification(existingSpec, refinements) {
+        logger.info('Refining specification...');
         const prompt = `
     Refine this existing specification based on user feedback:
     

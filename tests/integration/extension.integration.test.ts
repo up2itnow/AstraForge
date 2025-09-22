@@ -7,37 +7,7 @@ import { LLMManager } from '../../src/llm/llmManager';
 import { VectorDB } from '../../src/db/vectorDB';
 import { WorkflowManager } from '../../src/workflow/workflowManager';
 import { GitManager } from '../../src/git/gitManager';
-
-// Mock vscode for integration testing
-jest.mock('vscode', () => ({
-  workspace: {
-    workspaceFolders: [{ uri: { fsPath: '/test/integration' } }],
-    fs: {
-      createDirectory: jest.fn(),
-      writeFile: jest.fn(),
-    },
-    getConfiguration: jest.fn(() => ({
-      get: jest.fn((key: string) => {
-        if (key === 'llmPanel') {
-          return [
-            { provider: 'OpenAI', key: 'test-integration-key', model: 'gpt-4', role: 'primary' },
-          ];
-        }
-        return undefined;
-      }),
-    })),
-  },
-  window: {
-    showInformationMessage: jest.fn(),
-    showErrorMessage: jest.fn(),
-    showQuickPick: jest.fn(),
-    showInputBox: jest.fn(),
-    showTextDocument: jest.fn(),
-  },
-  Uri: {
-    file: jest.fn((path: string) => ({ fsPath: path })),
-  },
-}));
+import axios from 'axios';
 
 // Mock external dependencies
 jest.mock('axios');
@@ -185,7 +155,7 @@ describe('AstraForge Extension Integration', () => {
 
       const result = await llmManager.queryLLM(0, 'test query');
 
-      expect(result).toContain('Error querying LLM');
+      expect(result).toContain('Error: API Rate Limit');
       expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
     });
 

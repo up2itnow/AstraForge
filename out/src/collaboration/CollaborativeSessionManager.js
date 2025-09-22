@@ -5,15 +5,17 @@
  * from initiation through completion, ensuring proper time management,
  * consensus building, and quality assurance.
  */
+// vscode not required directly in this manager
 import { EventEmitter } from 'events';
 import { CollaborationError } from './types/collaborationTypes';
 import { TimeManager } from './timing/TimeManager';
 import { CollaborationRound } from './rounds/CollaborationRound';
+import { logger } from '../utils/logger';
 export class CollaborativeSessionManager extends EventEmitter {
-    constructor(llmManager, vectorDB, testMode = false) {
+    constructor(_llmManager, _vectorDB, testMode = false) {
         super();
-        this.llmManager = llmManager;
-        this.vectorDB = vectorDB;
+        this._llmManager = _llmManager;
+        this._vectorDB = _vectorDB;
         this.sessions = new Map();
         this.sessionIdCounter = 0;
         this.testMode = false;
@@ -26,8 +28,8 @@ export class CollaborativeSessionManager extends EventEmitter {
      */
     async startSession(request) {
         const sessionId = `session_${++this.sessionIdCounter}_${Date.now()}`;
-        console.log(`🚀 Starting collaborative session ${sessionId}`);
-        console.log(`📝 Prompt: ${request.prompt.substring(0, 100)}...`);
+        logger.info(`🚀 Starting collaborative session ${sessionId}`);
+        logger.debug(`📝 Prompt: ${request.prompt.substring(0, 100)}...`);
         try {
             // Validate request
             this.validateRequest(request);
@@ -48,7 +50,7 @@ export class CollaborativeSessionManager extends EventEmitter {
             };
             this.sessions.set(sessionId, session);
             // Set up session timer
-            const sessionTimerId = this.timeManager.createSessionTimer(sessionId, session.timeLimit, (remaining) => this.handleSessionWarning(sessionId, remaining), () => this.handleSessionTimeout(sessionId));
+            const _sessionTimerId = this.timeManager.createSessionTimer(sessionId, session.timeLimit, (remaining) => this.handleSessionWarning(sessionId, remaining), () => this.handleSessionTimeout(sessionId));
             // Update status and emit event
             session.status = 'active';
             this.emitEvent('session_started', sessionId, { session });
@@ -59,7 +61,7 @@ export class CollaborativeSessionManager extends EventEmitter {
             return session;
         }
         catch (error) {
-            console.error(`❌ Failed to start session ${sessionId}:`, error);
+            logger.error(`❌ Failed to start session ${sessionId}:`, error);
             const collaborationError = error instanceof CollaborationError
                 ? error
                 : new CollaborationError(`Failed to start session: ${error}`, 'SESSION_START_FAILED', sessionId);
@@ -73,15 +75,15 @@ export class CollaborativeSessionManager extends EventEmitter {
     async executeRounds(session) {
         const maxRounds = session.request.maxRounds || 4;
         const roundTypes = ['propose', 'critique', 'synthesize', 'validate'];
-        console.log(`🔄 Executing up to ${maxRounds} collaboration rounds`);
+        logger.info(`🔄 Executing up to ${maxRounds} collaboration rounds`);
         for (let roundNumber = 1; roundNumber <= maxRounds; roundNumber++) {
             if (session.status !== 'active') {
-                console.log(`⏹️ Session ${session.id} no longer active, stopping rounds`);
+                logger.warn(`⏹️ Session ${session.id} no longer active, stopping rounds`);
                 break;
             }
             const roundType = roundTypes[Math.min(roundNumber - 1, roundTypes.length - 1)];
             try {
-                console.log(`🎯 Starting round ${roundNumber}: ${roundType}`);
+                logger.info(`🎯 Starting round ${roundNumber}: ${roundType}`);
                 const round = new CollaborationRound(session.id, roundNumber, roundType, this.getRoundPurpose(roundType, roundNumber), this.getRoundTimeLimit(roundType));
                 // Add round to session
                 session.rounds.push(round);
@@ -90,18 +92,18 @@ export class CollaborativeSessionManager extends EventEmitter {
                 await this.executeRound(session, round);
                 // Check if we've reached consensus
                 if (this.hasReachedConsensus(session)) {
-                    console.log(`✅ Consensus reached in round ${roundNumber}`);
+                    logger.info(`✅ Consensus reached in round ${roundNumber}`);
                     session.status = 'consensus_reached';
                     break;
                 }
                 // Check quality threshold
                 if (this.meetsQualityThreshold(session)) {
-                    console.log(`🎯 Quality threshold met in round ${roundNumber}`);
+                    logger.info(`🎯 Quality threshold met in round ${roundNumber}`);
                     break;
                 }
             }
             catch (error) {
-                console.error(`❌ Error in round ${roundNumber}:`, error);
+                logger.error(`❌ Error in round ${roundNumber}:`, error);
                 // Continue to next round unless critical error
                 if (error instanceof CollaborationError && error.code === 'CRITICAL_FAILURE') {
                     throw error;
@@ -139,7 +141,7 @@ export class CollaborativeSessionManager extends EventEmitter {
             round.endTime = new Date();
         }
         catch (error) {
-            console.error(`❌ Round ${round.id} failed:`, error);
+            logger.error(`❌ Round ${round.id} failed:`, error);
             round.status = 'timeout';
             throw error;
         }
@@ -151,14 +153,14 @@ export class CollaborativeSessionManager extends EventEmitter {
      * Execute a proposal round where LLMs generate initial ideas
      */
     async executeProposalRound(session, round) {
-        console.log(`💡 Executing proposal round`);
+        logger.info(`💡 Executing proposal round`);
         const proposalPrompt = this.buildProposalPrompt(session.request);
         // Get proposals from all active participants in parallel
         const proposalPromises = session.participants
             .filter(p => p.isActive)
             .map(async (participant) => {
             try {
-                const response = await this.llmManager.generateResponse(participant.provider.toLowerCase(), proposalPrompt);
+                const response = await this._llmManager.generateResponse(participant.provider.toLowerCase(), proposalPrompt);
                 const contribution = {
                     id: `contrib_${Date.now()}_${participant.id}`,
                     roundId: round.id,
@@ -179,18 +181,18 @@ export class CollaborativeSessionManager extends EventEmitter {
                 return contribution;
             }
             catch (error) {
-                console.error(`❌ Error getting proposal from ${participant.provider}:`, error);
+                logger.error(`❌ Error getting proposal from ${participant.provider}:`, error);
                 return null;
             }
         });
         await Promise.all(proposalPromises);
-        console.log(`💡 Collected ${round.contributions.length} proposals`);
+        logger.info(`💡 Collected ${round.contributions.length} proposals`);
     }
     /**
      * Execute a critique round where LLMs review and provide feedback
      */
     async executeCritiqueRound(session, round) {
-        console.log(`🔍 Executing critique round`);
+        logger.info(`🔍 Executing critique round`);
         // Get previous round's contributions
         const previousRound = session.rounds[session.rounds.length - 2]; // -1 is current round, -2 is previous
         if (!previousRound || previousRound.contributions.length === 0) {
@@ -202,7 +204,7 @@ export class CollaborativeSessionManager extends EventEmitter {
             .filter(p => p.isActive)
             .map(async (participant) => {
             try {
-                const response = await this.llmManager.generateResponse(participant.provider.toLowerCase(), critiquePrompt);
+                const response = await this._llmManager.generateResponse(participant.provider.toLowerCase(), critiquePrompt);
                 const contribution = {
                     id: `contrib_${Date.now()}_${participant.id}`,
                     roundId: round.id,
@@ -223,18 +225,18 @@ export class CollaborativeSessionManager extends EventEmitter {
                 return contribution;
             }
             catch (error) {
-                console.error(`❌ Error getting critique from ${participant.provider}:`, error);
+                logger.error(`❌ Error getting critique from ${participant.provider}:`, error);
                 return null;
             }
         });
         await Promise.all(critiquePromises);
-        console.log(`🔍 Collected ${round.contributions.length} critiques`);
+        logger.info(`🔍 Collected ${round.contributions.length} critiques`);
     }
     /**
      * Execute a synthesis round where ideas are combined
      */
     async executeSynthesisRound(session, round) {
-        console.log(`🔀 Executing synthesis round`);
+        logger.info(`🔀 Executing synthesis round`);
         // Get all previous contributions
         const allContributions = session.rounds
             .slice(0, -1) // Exclude current round
@@ -246,7 +248,7 @@ export class CollaborativeSessionManager extends EventEmitter {
         // Use the most capable participant for synthesis (TODO: Make this intelligent)
         const synthesizer = this.selectSynthesizer(session.participants);
         try {
-            const response = await this.llmManager.generateResponse(synthesizer.provider.toLowerCase(), synthesisPrompt);
+            const response = await this._llmManager.generateResponse(synthesizer.provider.toLowerCase(), synthesisPrompt);
             const contribution = {
                 id: `contrib_${Date.now()}_${synthesizer.id}`,
                 roundId: round.id,
@@ -266,16 +268,16 @@ export class CollaborativeSessionManager extends EventEmitter {
             this.emitEvent('contribution_received', session.id, { contribution });
         }
         catch (error) {
-            console.error(`❌ Error in synthesis:`, error);
+            logger.error(`❌ Error in synthesis:`, error);
             throw error;
         }
-        console.log(`🔀 Synthesis completed`);
+        logger.info(`🔀 Synthesis completed`);
     }
     /**
      * Execute a validation round where the synthesized solution is validated
      */
     async executeValidationRound(session, round) {
-        console.log(`✅ Executing validation round`);
+        logger.info(`✅ Executing validation round`);
         // Get the synthesis from previous round
         const synthesisRound = session.rounds[session.rounds.length - 2];
         if (!synthesisRound || synthesisRound.contributions.length === 0) {
@@ -288,7 +290,7 @@ export class CollaborativeSessionManager extends EventEmitter {
             .filter(p => p.isActive && p.id !== synthesisContribution.author.id) // Exclude synthesizer
             .map(async (participant) => {
             try {
-                const response = await this.llmManager.generateResponse(participant.provider.toLowerCase(), validationPrompt);
+                const response = await this._llmManager.generateResponse(participant.provider.toLowerCase(), validationPrompt);
                 const contribution = {
                     id: `contrib_${Date.now()}_${participant.id}`,
                     roundId: round.id,
@@ -309,18 +311,18 @@ export class CollaborativeSessionManager extends EventEmitter {
                 return contribution;
             }
             catch (error) {
-                console.error(`❌ Error getting validation from ${participant.provider}:`, error);
+                logger.error(`❌ Error getting validation from ${participant.provider}:`, error);
                 return null;
             }
         });
         await Promise.all(validationPromises);
-        console.log(`✅ Collected ${round.contributions.length} validations`);
+        logger.info(`✅ Collected ${round.contributions.length} validations`);
     }
     /**
      * Finalize the collaborative session and generate output
      */
     async finalizeSession(session) {
-        console.log(`🏁 Finalizing session ${session.id}`);
+        logger.info(`🏁 Finalizing session ${session.id}`);
         session.endTime = new Date();
         session.status = 'completed';
         // Generate collaborative output
@@ -330,10 +332,10 @@ export class CollaborativeSessionManager extends EventEmitter {
         // Store in vector DB for future reference
         await this.storeSessionInVectorDB(session);
         this.emitEvent('session_completed', session.id, { session });
-        console.log(`✅ Session ${session.id} completed successfully`);
-        console.log(`📊 Quality Score: ${session.output.qualityScore}`);
-        console.log(`🎯 Consensus Level: ${session.output.consensusLevel}`);
-        console.log(`⚡ Token Usage: ${session.output.tokenUsage.totalTokens}`);
+        logger.info(`✅ Session ${session.id} completed successfully`);
+        logger.info(`📊 Quality Score: ${session.output.qualityScore}`);
+        logger.info(`🎯 Consensus Level: ${session.output.consensusLevel}`);
+        logger.info(`⚡ Token Usage: ${session.output.tokenUsage.totalTokens}`);
     }
     // Helper methods would continue here...
     // Due to length constraints, I'll include the key helper method signatures
@@ -403,7 +405,7 @@ export class CollaborativeSessionManager extends EventEmitter {
             emergenceScore: 0
         };
     }
-    getRoundPurpose(type, roundNumber) {
+    getRoundPurpose(type, _roundNumber) {
         const purposes = {
             propose: `Generate initial ideas and approaches for the given problem`,
             critique: `Review and provide constructive feedback on previous proposals`,
@@ -443,11 +445,11 @@ export class CollaborativeSessionManager extends EventEmitter {
         // Rough estimation: ~4 characters per token
         return Math.ceil(text.length / 4);
     }
-    hasReachedConsensus(session) {
+    hasReachedConsensus(_session) {
         // TODO: Implement consensus detection logic
         return false;
     }
-    meetsQualityThreshold(session) {
+    meetsQualityThreshold(_session) {
         // TODO: Implement quality threshold checking
         return false;
     }
@@ -489,7 +491,7 @@ export class CollaborativeSessionManager extends EventEmitter {
             sessionId: session.id,
             content: finalContent,
             sources: allContributions,
-            rounds: session.rounds.map(r => r.roundOutput).filter(Boolean),
+            rounds: session.rounds.map(r => r.roundOutput).filter((r) => r !== undefined),
             emergenceIndicators: this.calculateEmergenceIndicators(session),
             qualityScore,
             consensusLevel,
@@ -522,25 +524,20 @@ export class CollaborativeSessionManager extends EventEmitter {
                 (participantContributions.length / Math.max(session.rounds.length, 1)) * 100;
         });
     }
-    determineSessionConsensus(session) {
+    determineSessionConsensus(_session) {
         // Simple implementation - return based on session status
-        if (session.status === 'consensus_reached')
-            return 'unanimous';
-        if (session.status === 'completed')
-            return 'qualified_majority';
-        if (session.status === 'timeout')
-            return 'forced_consensus';
+        // Note: _session parameter is unused but kept for future implementation
         return 'simple_majority';
     }
-    calculateEmergenceIndicators(session) {
+    calculateEmergenceIndicators(_session) {
         // Simple implementation - return empty array for now
         return [];
     }
-    generateSynthesisLog(session) {
+    generateSynthesisLog(_session) {
         // Simple implementation - return empty array for now
         return [];
     }
-    calculateImprovementMetrics(session) {
+    calculateImprovementMetrics(_session) {
         // Simple implementation - return empty array for now
         return [];
     }
@@ -548,7 +545,7 @@ export class CollaborativeSessionManager extends EventEmitter {
         try {
             if (session.output) {
                 const sessionSummary = `Collaborative session: ${session.request.prompt}\nResult: ${session.output.content.substring(0, 500)}...`;
-                await this.vectorDB.addDocument(`session_${session.id}`, sessionSummary, {
+                await this._vectorDB.addDocument(`session_${session.id}`, sessionSummary, {
                     type: 'collaboration_session',
                     sessionId: session.id,
                     qualityScore: session.output.qualityScore,
@@ -559,16 +556,16 @@ export class CollaborativeSessionManager extends EventEmitter {
             }
         }
         catch (error) {
-            console.error(`Failed to store session ${session.id} in VectorDB:`, error);
+            logger.warn(`Failed to store session ${session.id} in VectorDB:`, error);
             // Don't throw - this is not critical for session completion
         }
     }
     handleSessionWarning(sessionId, remaining) {
-        console.log(`⚠️ Session ${sessionId} time warning: ${Math.round(remaining / 1000)}s remaining`);
+        logger.warn(`⚠️ Session ${sessionId} time warning: ${Math.round(remaining / 1000)}s remaining`);
         this.emitEvent('timeout_warning', sessionId, { remaining });
     }
     handleSessionTimeout(sessionId) {
-        console.log(`⏰ Session ${sessionId} timeout - forcing completion`);
+        logger.warn(`⏰ Session ${sessionId} timeout - forcing completion`);
         const session = this.sessions.get(sessionId);
         if (session) {
             session.status = 'timeout';
@@ -576,17 +573,17 @@ export class CollaborativeSessionManager extends EventEmitter {
         }
     }
     handleRoundWarning(sessionId, roundId, remaining) {
-        console.log(`⚠️ Round ${roundId} time warning: ${Math.round(remaining / 1000)}s remaining`);
+        logger.warn(`⚠️ Round ${roundId} time warning: ${Math.round(remaining / 1000)}s remaining`);
     }
     handleRoundTimeout(sessionId, roundId) {
-        console.log(`⏰ Round ${roundId} timeout`);
+        logger.warn(`⏰ Round ${roundId} timeout`);
     }
     setupEventHandlers() {
         // Set up internal event handling
     }
     emitEvent(type, sessionId, data) {
         const event = {
-            type: type,
+            type,
             sessionId,
             timestamp: new Date(),
             data
@@ -621,7 +618,7 @@ export class CollaborativeSessionManager extends EventEmitter {
         // Store results in vector DB
         session.output = output; // Set the output first
         await this.storeSessionInVectorDB(session);
-        console.log(`✅ Completed collaborative session ${sessionId}`);
+        logger.info(`✅ Completed collaborative session ${sessionId}`);
         this.emit('session_completed', { sessionId, output });
         return output;
     }

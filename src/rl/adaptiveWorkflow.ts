@@ -155,58 +155,109 @@ export class AdaptiveWorkflowRL {
   ): number {
     let reward = 0;
 
-    // Base reward for phase success
-    if (phaseSuccess) {
-      reward += 1.0;
-    } else {
-      reward -= 0.5;
-    }
-
-    // Reward for improving user satisfaction
-    const satisfactionImprovement = newState.userSatisfaction - oldState.userSatisfaction;
-    reward += satisfactionImprovement * 2.0;
-
-    // Penalty for increasing error rate
-    const errorIncrease = newState.errorRate - oldState.errorRate;
-    reward -= errorIncrease * 1.5;
-
-    // Reward for efficient time usage
-    if (newState.timeSpent < oldState.timeSpent && phaseSuccess) {
-      reward += 0.3;
-    }
-
-    // Action-specific rewards
-    switch (action.type) {
-      case 'continue':
-        if (phaseSuccess && newState.userSatisfaction > 0.7) {
-          reward += 0.2;
-        }
-        break;
-      case 'skip':
-        if (oldState.projectComplexity < 0.3 && phaseSuccess) {
-          reward += 0.4; // Good to skip for simple projects
-        } else {
-          reward -= 0.3; // Risky for complex projects
-        }
-        break;
-      case 'repeat':
-        if (oldState.errorRate > 0.5 && newState.errorRate < oldState.errorRate) {
-          reward += 0.5; // Good decision to repeat when there were errors
-        }
-        break;
-      case 'optimize':
-        if (newState.timeSpent < oldState.timeSpent * 0.8) {
-          reward += 0.6; // Significant time improvement
-        }
-        break;
-    }
-
-    // User feedback integration
-    if (userFeedback !== undefined) {
-      reward += (userFeedback - 0.5) * 2.0; // Scale 0-1 feedback to -1 to +1
-    }
+    reward += this.calculateBaseReward(phaseSuccess);
+    reward += this.calculateSatisfactionReward(oldState, newState);
+    reward += this.calculateErrorPenalty(oldState, newState);
+    reward += this.calculateEfficiencyReward(oldState, newState, phaseSuccess);
+    reward += this.calculateActionSpecificReward(action, oldState, newState, phaseSuccess);
+    reward += this.calculateUserFeedbackReward(userFeedback);
 
     return Math.max(-2.0, Math.min(2.0, reward)); // Clamp reward between -2 and +2
+  }
+
+  /**
+   * Calculate base reward for phase success
+   */
+  private calculateBaseReward(phaseSuccess: boolean): number {
+    return phaseSuccess ? 1.0 : -0.5;
+  }
+
+  /**
+   * Calculate reward for user satisfaction improvement
+   */
+  private calculateSatisfactionReward(oldState: WorkflowState, newState: WorkflowState): number {
+    const satisfactionImprovement = newState.userSatisfaction - oldState.userSatisfaction;
+    return satisfactionImprovement * 2.0;
+  }
+
+  /**
+   * Calculate penalty for error rate increase
+   */
+  private calculateErrorPenalty(oldState: WorkflowState, newState: WorkflowState): number {
+    const errorIncrease = newState.errorRate - oldState.errorRate;
+    return -(errorIncrease * 1.5);
+  }
+
+  /**
+   * Calculate reward for efficient time usage
+   */
+  private calculateEfficiencyReward(oldState: WorkflowState, newState: WorkflowState, phaseSuccess: boolean): number {
+    if (newState.timeSpent < oldState.timeSpent && phaseSuccess) {
+      return 0.3;
+    }
+    return 0;
+  }
+
+  /**
+   * Calculate action-specific rewards
+   */
+  private calculateActionSpecificReward(
+    action: WorkflowAction,
+    oldState: WorkflowState,
+    newState: WorkflowState,
+    phaseSuccess: boolean
+  ): number {
+    switch (action.type) {
+      case 'continue':
+        return this.calculateContinueReward(phaseSuccess, newState);
+      case 'skip':
+        return this.calculateSkipReward(oldState, phaseSuccess);
+      case 'repeat':
+        return this.calculateRepeatReward(oldState, newState);
+      case 'optimize':
+        return this.calculateOptimizeReward(oldState, newState);
+      default:
+        return 0;
+    }
+  }
+
+  private calculateContinueReward(phaseSuccess: boolean, newState: WorkflowState): number {
+    if (phaseSuccess && newState.userSatisfaction > 0.7) {
+      return 0.2;
+    }
+    return 0;
+  }
+
+  private calculateSkipReward(oldState: WorkflowState, phaseSuccess: boolean): number {
+    if (oldState.projectComplexity < 0.3 && phaseSuccess) {
+      return 0.4; // Good to skip for simple projects
+    } else {
+      return -0.3; // Risky for complex projects
+    }
+  }
+
+  private calculateRepeatReward(oldState: WorkflowState, newState: WorkflowState): number {
+    if (oldState.errorRate > 0.5 && newState.errorRate < oldState.errorRate) {
+      return 0.5; // Good decision to repeat when there were errors
+    }
+    return 0;
+  }
+
+  private calculateOptimizeReward(oldState: WorkflowState, newState: WorkflowState): number {
+    if (newState.timeSpent < oldState.timeSpent * 0.8) {
+      return 0.6; // Significant time improvement
+    }
+    return 0;
+  }
+
+  /**
+   * Calculate reward from user feedback
+   */
+  private calculateUserFeedbackReward(userFeedback?: number): number {
+    if (userFeedback !== undefined) {
+      return (userFeedback - 0.5) * 2.0; // Scale 0-1 feedback to -1 to +1
+    }
+    return 0;
   }
 
   private getRandomAction(): WorkflowAction {

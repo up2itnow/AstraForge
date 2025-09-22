@@ -46,17 +46,50 @@ export function validateLLMInput(
   options: ValidationOptions = DEFAULT_PROMPT_OPTIONS
 ): ValidationResult {
   const errors: string[] = [];
-  let sanitized = input;
 
-  // Basic null/undefined check
+  // Basic input validation
+  const basicValidation = validateBasicInput(input);
+  if (!basicValidation.isValid) {
+    return basicValidation;
+  }
+
+  // Length validation
+  const lengthErrors = validateInputLength(input, options);
+  errors.push(...lengthErrors);
+
+  // Content sanitization
+  const sanitizedInput = sanitizeInput(input, options);
+
+  // Pattern validation
+  const patternErrors = validatePatterns(sanitizedInput, options);
+  errors.push(...patternErrors);
+
+  return {
+    isValid: errors.length === 0,
+    sanitized: errors.length === 0 ? sanitizedInput.trim() : undefined,
+    errors,
+  };
+}
+
+/**
+ * Validate basic input properties
+ */
+function validateBasicInput(input: string): ValidationResult {
   if (!input || typeof input !== 'string') {
     return {
       isValid: false,
       errors: ['Input must be a non-empty string'],
     };
   }
+  return { isValid: true, errors: [] };
+}
 
-  // Length validation
+/**
+ * Validate input length
+ */
+function validateInputLength(input: string, options: ValidationOptions): string[] {
+  const errors: string[] = [];
+
   if (options.maxLength && input.length > options.maxLength) {
     errors.push(`Input exceeds maximum length of ${options.maxLength} characters`);
   }
@@ -65,8 +98,17 @@ export function validateLLMInput(
     errors.push(`Input must be at least ${options.minLength} characters long`);
   }
 
+  return errors;
+}
+
+/**
+ * Sanitize input by removing dangerous content
+ */
+function sanitizeInput(input: string, options: ValidationOptions): string {
+  let sanitized = input;
+
   // Remove control characters and potentially dangerous content
-  sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, '');
+  sanitized = sanitized.replace(/[\u0000-\u001F\u007F]/g, '');
 
   // HTML/Script sanitization
   if (!options.allowHtml) {
@@ -79,6 +121,15 @@ export function validateLLMInput(
     sanitized = sanitized.replace(/on\w+\s*=/gi, '');
   }
 
+  return sanitized;
+}
+
+/**
+ * Validate input against suspicious patterns
+ */
+function validatePatterns(sanitizedInput: string, options: ValidationOptions): string[] {
+  const errors: string[] = [];
+
   // Check for suspicious patterns
   const suspiciousPatterns = [
     /system\s*:/gi,
@@ -88,7 +139,7 @@ export function validateLLMInput(
   ];
 
   for (const pattern of suspiciousPatterns) {
-    if (pattern.test(sanitized)) {
+    if (pattern.test(sanitizedInput)) {
       errors.push('Input contains potentially suspicious content');
       break;
     }
@@ -97,7 +148,7 @@ export function validateLLMInput(
   // Custom pattern validation
   if (options.customPatterns) {
     for (const pattern of options.customPatterns) {
-      if (pattern.test(sanitized)) {
+      if (pattern.test(sanitizedInput)) {
         errors.push('Input violates custom validation pattern');
         break;
       }
@@ -113,17 +164,13 @@ export function validateLLMInput(
   ];
 
   for (const pattern of injectionPatterns) {
-    if (pattern.test(sanitized)) {
+    if (pattern.test(sanitizedInput)) {
       errors.push('Input contains potentially unsafe template syntax');
       break;
     }
   }
 
-  return {
-    isValid: errors.length === 0,
-    errors,
-    sanitized: errors.length === 0 ? sanitized.trim() : undefined,
-  };
+  return errors;
 }
 
 /**
@@ -231,7 +278,7 @@ export function validateFileContent(content: string, filename?: string): Validat
   }
 
   // Check for binary content
-  if (/[\x00-\x08\x0E-\x1F\x7F]/.test(content)) {
+  if (/[\u0000-\u0008\u000E-\u001F\u007F]/.test(content)) {
     errors.push('File appears to contain binary data');
   }
 

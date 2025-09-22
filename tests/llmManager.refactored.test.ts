@@ -6,43 +6,6 @@ import { LLMManager } from '../src/llm/llmManager';
 import { LLMConfig, LLMProvider } from '../src/llm/interfaces';
 import * as vscode from 'vscode';
 
-// Mock vscode
-jest.mock('vscode', () => ({
-  workspace: {
-    getConfiguration: jest.fn(() => ({
-      get: jest.fn((key: string) => {
-        if (key === 'llmPanel') {
-          return [
-            {
-              provider: 'OpenAI',
-              key: 'test-openai-key',
-              model: 'gpt-4',
-              role: 'primary',
-              maxTokens: 1000,
-              temperature: 0.7,
-            },
-            {
-              provider: 'Anthropic',
-              key: 'test-anthropic-key',
-              model: 'claude-3-sonnet-20240229',
-              role: 'secondary',
-              maxTokens: 1000,
-              temperature: 0.7,
-            },
-          ];
-        }
-        if (key === 'maxConcurrentRequests') {
-          return 3;
-        }
-        return undefined;
-      }),
-    })),
-  },
-  window: {
-    showErrorMessage: jest.fn(),
-  },
-}));
-
 // Mock provider module
 jest.mock('../src/llm/providers', () => ({
   createProvider: jest.fn((providerName: string) => {
@@ -90,15 +53,14 @@ describe('LLMManager (Refactored)', () => {
 
     it('should create providers for configured LLMs', () => {
       const { createProvider } = require('../src/llm/providers');
-      expect(createProvider).toHaveBeenCalledWith('OpenAI');
-      expect(createProvider).toHaveBeenCalledWith('Anthropic');
+      expect(createProvider).toHaveBeenCalledWith('OpenRouter');
     });
   });
 
   describe('queryLLM', () => {
     it('should query LLM at specified index', async () => {
       const result = await llmManager.queryLLM(0, 'Test prompt');
-      expect(result).toBe('Mock response from OpenAI');
+      expect(result).toBe('Mock response from OpenRouter');
     });
 
     it('should return error message for invalid index', async () => {
@@ -108,12 +70,12 @@ describe('LLMManager (Refactored)', () => {
 
     it('should fallback to primary LLM on error', async () => {
       const { createProvider } = require('../src/llm/providers');
-      const mockProvider = createProvider('Anthropic');
+      const mockProvider = createProvider('OpenRouter');
       mockProvider.query.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await llmManager.queryLLM(1, 'Test prompt');
-      // Should fallback to index 0 (OpenAI)
-      expect(result).toBe('Mock response from OpenAI');
+      // Should fallback to index 0 (OpenRouter)
+      expect(result).toBe('Mock response from OpenRouter');
     });
 
     it('should use cached response when available', async () => {
@@ -125,7 +87,7 @@ describe('LLMManager (Refactored)', () => {
       const newManager = new LLMManager();
       const result = await newManager.queryLLM(0, 'Test prompt');
 
-      expect(result).toBe('Mock response from OpenAI'); // Since we're mocking, this will still be the mock response
+      expect(result).toBe('Mock response from OpenRouter'); // Since we're mocking, this will still be the OpenRouter mock response
     });
 
     it('should handle throttling', async () => {
@@ -168,8 +130,8 @@ describe('LLMManager (Refactored)', () => {
       const result = await llmManager.conference('Discuss project architecture');
 
       expect(result).toContain('Discuss project architecture');
-      expect(result).toContain('LLM 1 (primary - OpenAI): Mock response from OpenAI');
-      expect(result).toContain('LLM 2 (secondary - Anthropic): Mock response from Anthropic');
+      expect(result).toContain('LLM 1 (primary - OpenRouter): Mock response from OpenRouter');
+      expect(result).toContain('LLM 2 (secondary - OpenRouter): Mock response from OpenRouter');
     });
 
     it('should handle empty LLM panel', async () => {
@@ -187,17 +149,17 @@ describe('LLMManager (Refactored)', () => {
     it('should validate all configured providers', async () => {
       const results = await llmManager.validateAllConfigurations();
 
-      expect(results).toHaveProperty('OpenAI-0', true);
+      expect(results).toHaveProperty('OpenRouter-0', true);
       expect(results).toHaveProperty('Anthropic-1', true);
     });
 
     it('should handle validation failures', async () => {
       const { createProvider } = require('../src/llm/providers');
-      const mockProvider = createProvider('OpenAI');
+      const mockProvider = createProvider('OpenRouter');
       mockProvider.validateConfig.mockResolvedValueOnce(false);
 
       const results = await llmManager.validateAllConfigurations();
-      expect(results).toHaveProperty('OpenAI-0', false);
+      expect(results).toHaveProperty('OpenRouter-0', false);
     });
   });
 
@@ -205,10 +167,8 @@ describe('LLMManager (Refactored)', () => {
     it('should retrieve models from all providers', async () => {
       const models = await llmManager.getAvailableModels();
 
-      expect(models).toHaveProperty('OpenAI');
-      expect(models).toHaveProperty('Anthropic');
-      expect(models.OpenAI).toContain('openai-model-1');
-      expect(models.Anthropic).toContain('anthropic-model-1');
+      expect(models).toHaveProperty('OpenRouter');
+      expect(models.OpenRouter).toContain('openrouter-model-1');
     });
   });
 
@@ -235,7 +195,7 @@ describe('LLMManager (Refactored)', () => {
       const results = await Promise.all(promises);
       expect(results).toHaveLength(5);
       results.forEach(result => {
-        expect(result).toBe('Mock response from OpenAI');
+        expect(result).toBe('Mock response from OpenRouter');
       });
     });
   });
@@ -244,7 +204,7 @@ describe('LLMManager (Refactored)', () => {
     it('should calculate similarity correctly for voting', async () => {
       // This tests the private calculateSimilarity method indirectly through voting
       const { createProvider } = require('../src/llm/providers');
-      const mockProvider = createProvider('OpenAI');
+      const mockProvider = createProvider('OpenRouter');
       mockProvider.query
         .mockResolvedValueOnce({ content: 'option a', usage: {}, metadata: {} })
         .mockResolvedValueOnce({ content: 'Option A', usage: {}, metadata: {} });

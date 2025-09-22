@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ApiTesterCore, TestResult, BatchTestResult, VectorTestResult } from './apiTesterCore';
+import { ApiTesterCore, _TestResult, _BatchTestResult, _VectorTestResult } from './apiTesterCore';
 
 export class ApiTesterProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'astraforge.apiTester';

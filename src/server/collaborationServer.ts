@@ -51,11 +51,18 @@ export class CollaborationServer {
         if (error) {
           reject(error);
         } else {
+          // Get the actual port assigned (in case port 0 was used)
+          const actualPort = (this.server.address() as any).port || this.port;
+          this.port = actualPort;
           console.log(`Collaboration server started on port ${this.port}`);
           resolve();
         }
       });
     });
+  }
+
+  getPort(): number {
+    return this.port;
   }
 
   async stop(): Promise<void> {

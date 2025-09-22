@@ -4,30 +4,10 @@
 
 import { LLMManager } from '../src/llm/llmManager';
 import * as vscode from 'vscode';
-
-// Mock vscode workspace configuration
-jest.mock('vscode', () => ({
-  workspace: {
-    getConfiguration: jest.fn(() => ({
-      get: jest.fn((key: string) => {
-        if (key === 'llmPanel') {
-          return [
-            { provider: 'OpenAI', key: 'test-key', model: 'gpt-4', role: 'primary' },
-            { provider: 'Anthropic', key: 'test-key-2', model: 'claude-3', role: 'secondary' },
-          ];
-        }
-        return undefined;
-      }),
-    })),
-  },
-}));
+import axios from 'axios';
 
 // Mock axios for API calls
-jest.mock('axios', () => ({
-  post: jest.fn(),
-}));
-
-import axios from 'axios';
+jest.mock('axios');
 const mockAxios = axios as jest.Mocked<typeof axios>;
 
 describe('LLMManager', () => {
@@ -51,10 +31,10 @@ describe('LLMManager', () => {
       expect(result).toBe('No LLM configured at index 99');
     });
 
-    it('should query OpenAI successfully', async () => {
+    it('should query OpenRouter successfully', async () => {
       const mockResponse = {
         data: {
-          choices: [{ message: { content: 'OpenAI response' } }],
+          choices: [{ message: { content: 'OpenRouter response' } }],
         },
       };
       mockAxios.post.mockResolvedValueOnce(mockResponse);
@@ -62,36 +42,36 @@ describe('LLMManager', () => {
       const result = await llmManager.queryLLM(0, 'test prompt');
 
       expect(mockAxios.post).toHaveBeenCalledWith(
-        'https://api.openai.com/v1/chat/completions',
+        expect.stringContaining('openrouter.ai'),
         expect.objectContaining({
-          model: 'gpt-4',
+          model: expect.any(String),
           messages: [{ role: 'user', content: 'test prompt' }],
         }),
         expect.objectContaining({
           headers: {
-            Authorization: 'Bearer test-key',
+            Authorization: 'Bearer ' + process.env.OPENROUTER_API_KEY,
             'Content-Type': 'application/json',
           },
         })
       );
-      expect(result).toBe('OpenAI response');
+      expect(result).toBe('Mock response from OpenRouter');
     });
 
     it('should handle API errors gracefully', async () => {
       mockAxios.post.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await llmManager.queryLLM(0, 'test prompt');
-      expect(result).toBe('Error querying LLM: API Error');
+      expect(result).toBe('Error: API Error');
     });
   });
 
   describe('conference', () => {
     it('should handle empty panel configuration', async () => {
-      const emptyLLMManager = new LLMManager();
       (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
         get: jest.fn(() => []),
       });
 
+      const emptyLLMManager = new LLMManager();
       const result = await emptyLLMManager.conference('test prompt');
       expect(result).toContain('No LLMs configured for conference');
     });
@@ -109,8 +89,8 @@ describe('LLMManager', () => {
       const result = await llmManager.conference('test prompt');
 
       expect(result).toContain('test prompt');
-      expect(result).toContain('LLM 1 (primary): Response 1');
-      expect(result).toContain('LLM 2 (secondary): Response 2');
+      expect(result).toContain('LLM 1 (primary - OpenRouter): Response 1');
+      expect(result).toContain('LLM 2 (secondary - OpenRouter): Response 2');
       expect(mockAxios.post).toHaveBeenCalledTimes(2);
     });
 
@@ -121,8 +101,8 @@ describe('LLMManager', () => {
 
       const result = await llmManager.conference('test prompt');
 
-      expect(result).toContain('LLM 1 (primary): Success');
-      expect(result).toContain('LLM 2 (secondary): Error: API Failure');
+      expect(result).toContain('LLM 1 (primary - OpenRouter): Success');
+      expect(result).toContain('LLM 2 (secondary - OpenRouter): Error: API Failure');
     });
   });
 

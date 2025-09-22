@@ -1,171 +1,130 @@
+/**
+ * AstraForge Workflow Manager
+ *
+ * Manages the complete software development workflow from idea to deployment.
+ * Integrates LLM collaboration, vector-based context retrieval, Git version control,
+ * and reinforcement learning for workflow optimization.
+ *
+ * @author AstraForge Team
+ * @version 1.0.0
+ */
 import * as vscode from 'vscode';
 import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
-import { SpecKitManager } from '../spec-kit/specKitManager';
+import { MetaLearningIntegration, createMetaLearningSystem } from '../meta-learning';
 import * as path from 'path';
+/**
+ * Main workflow orchestrator that manages the complete development lifecycle
+ *
+ * Features:
+ * - Phase-based development (Planning → Prototyping → Testing → Deployment)
+ * - Multi-LLM collaboration and consensus voting
+ * - Vector-based context retrieval for consistency
+ * - Reinforcement learning for workflow optimization
+ * - Real-time collaboration support
+ * - Git integration for version control
+ * - User oversight and feedback integration
+ */
 export class WorkflowManager {
-    constructor(llmManager, vectorDB, gitManager, testMode = false) {
+    /**
+     * Initialize the WorkflowManager with required dependencies
+     *
+     * @param llmManager - Manager for LLM provider interactions
+     * @param vectorDB - Vector database for context storage and retrieval
+     * @param gitManager - Git integration for version control
+     * @param emergentBehaviorSystem - System for emergent behavior detection
+     */
+    constructor(llmManager, vectorDB, gitManager, emergentBehaviorSystem) {
         this.llmManager = llmManager;
         this.vectorDB = vectorDB;
         this.gitManager = gitManager;
-        this.testMode = testMode;
+        /** Current phase index in the workflow */
         this.currentPhase = 0;
-        this.phases = ['Specification', 'Planning', 'Tasks', 'Implementation', 'Deployment'];
+        /** Ordered list of workflow phases */
+        this.phases = ['Planning', 'Prototyping', 'Testing', 'Deployment'];
+        /** User's project idea/description */
         this.projectIdea = '';
+        /** Generated project plan */
         this.buildPlan = '';
-        // These parameters are used throughout the class methods
         this.workflowRL = new AdaptiveWorkflowRL();
         this.workspaceId = `workspace_${Date.now()}`;
+        this.emergentBehaviorSystem = emergentBehaviorSystem;
         this.metrics = {
             startTime: Date.now(),
             phaseStartTime: Date.now(),
             errors: 0,
             userFeedback: [],
-            iterations: 0
+            iterations: 0,
         };
-        this.specKitManager = new SpecKitManager(llmManager, vectorDB, gitManager);
-        // Initialize vector database
-        this.vectorDB.init();
         this.initializeCollaboration();
+        this.initializeMetaLearning();
+        this.initializeEmergentBehavior();
     }
-    async executeSpecDrivenWorkflow(idea, option) {
-        console.log('🌱 Starting spec-driven workflow for:', idea);
-        // Phase 1: Create Specification
-        this.currentPhase = 0; // Specification
-        await this.updatePhaseProgress('Specification', 'Generating comprehensive specification...');
-        const specRequest = {
-            userIdea: idea,
-            projectContext: option === 'letPanelDecide' ? 'Multi-LLM collaboration requested' : undefined,
-            constraints: ['VS Code extension environment', 'TypeScript/Node.js stack']
-        };
-        const workflowId = await this.specKitManager.createSpecification(specRequest);
-        this.currentSpecWorkflow = this.specKitManager.getWorkflow(workflowId);
-        if (!this.currentSpecWorkflow) {
-            throw new Error('Failed to create specification workflow');
-        }
-        // Phase 2: Create Implementation Plan
-        this.currentPhase = 1; // Planning
-        await this.updatePhaseProgress('Planning', 'Creating technical implementation plan...');
-        await this.specKitManager.createImplementationPlan(workflowId);
-        this.currentSpecWorkflow = this.specKitManager.getWorkflow(workflowId);
-        // Phase 3: Generate Tasks
-        this.currentPhase = 2; // Tasks
-        await this.updatePhaseProgress('Tasks', 'Generating detailed task list...');
-        await this.specKitManager.generateTasks(workflowId);
-        this.currentSpecWorkflow = this.specKitManager.getWorkflow(workflowId);
-        // Phase 4: Execute Implementation (integrate with existing workflow)
-        this.currentPhase = 3; // Implementation
-        await this.updatePhaseProgress('Implementation', 'Executing tasks following TDD principles...');
-        if (this.currentSpecWorkflow && this.currentSpecWorkflow.tasks) {
-            await this.executeSpecKitTasks(this.currentSpecWorkflow.tasks);
-        }
-        // Phase 5: Deployment (existing logic)
-        this.currentPhase = 4; // Deployment
-        await this.updatePhaseProgress('Deployment', 'Preparing for deployment...');
-        console.log('✅ Spec-driven workflow completed successfully!');
-    }
-    async executeSpecKitTasks(taskList) {
-        console.log('📋 Executing', taskList.tasks.length, 'tasks...');
-        // Group tasks by phase for execution
-        const tasksByPhase = new Map();
-        taskList.tasks.forEach((task) => {
-            const phase = task.phase || 'implementation';
-            if (!tasksByPhase.has(phase)) {
-                tasksByPhase.set(phase, []);
-            }
-            tasksByPhase.get(phase).push(task);
-        });
-        // Execute tasks in order: setup -> tests -> implementation -> integration -> polish
-        const phaseOrder = ['setup', 'tests', 'implementation', 'integration', 'polish'];
-        for (const phase of phaseOrder) {
-            const phaseTasks = tasksByPhase.get(phase) || [];
-            if (phaseTasks.length === 0)
-                continue;
-            console.log(`🔄 Executing ${phase} phase (${phaseTasks.length} tasks)...`);
-            // Execute parallel tasks concurrently
-            const parallelTasks = phaseTasks.filter(t => t.isParallel);
-            const sequentialTasks = phaseTasks.filter(t => !t.isParallel);
-            // Execute parallel tasks
-            if (parallelTasks.length > 0) {
-                await Promise.all(parallelTasks.map(task => this.executeTask(task)));
-            }
-            // Execute sequential tasks
-            for (const task of sequentialTasks) {
-                await this.executeTask(task);
-            }
-            console.log(`✅ ${phase} phase completed`);
+    /**
+     * Initialize emergent behavior system integration
+     */
+    initializeEmergentBehavior() {
+        if (this.emergentBehaviorSystem) {
+            console.log('🧬 Emergent behavior system integrated with workflow manager');
         }
     }
-    async executeTask(task) {
-        console.log(`🔧 Executing task ${task.id}: ${task.description}`);
-        try {
-            // Use LLM to generate code/content for the task
-            const prompt = `
-      Execute this development task:
-      
-      Task: ${task.description}
-      File: ${task.filePath}
-      Type: ${task.type}
-      
-      Context: This is part of a spec-driven development workflow.
-      ${task.type === 'test' ? 'Generate failing tests following TDD principles.' : ''}
-      ${task.type === 'implementation' ? 'Implement code to make the tests pass.' : ''}
-      
-      Generate the appropriate code/content for this task.
-      `;
-            const result = await this.llmManager.generateResponse('openai', prompt);
-            // Store the result in vector DB for context
-            await this.vectorDB.addDocument(`task-${task.id}`, result, {
-                taskId: task.id,
-                taskType: task.type,
-                filePath: task.filePath
-            });
-            console.log(`✅ Task ${task.id} completed`);
-        }
-        catch (error) {
-            console.error(`❌ Task ${task.id} failed:`, error);
-            this.metrics.errors++;
-        }
-    }
-    async updatePhaseProgress(phaseName, description) {
-        // Update metrics
-        this.metrics.phaseStartTime = Date.now();
-        this.metrics.iterations++;
-        // Notify collaboration server
-        if (this.collaborationServer) {
-            this.collaborationServer.broadcastToWorkspace(this.workspaceId, 'progress', {
-                phase: phaseName,
-                description,
-                progress: (this.currentPhase + 1) / this.phases.length * 100
-            });
-        }
-        // Show progress to user
-        vscode.window.showInformationMessage(`🚀 ${phaseName}: ${description}`);
-    }
+    /**
+     * Start a new development workflow from a project idea
+     *
+     * @param idea - The user's project description or idea
+     * @param option - Optional workflow configuration or starting phase
+     * @returns Promise that resolves when workflow initialization is complete
+     *
+     * @example
+     * ```typescript
+     * await workflowManager.startWorkflow(
+     *   "Create a task management app with React and TypeScript"
+     * );
+     * ```
+     */
     async startWorkflow(idea, option) {
         this.projectIdea = idea;
         this.currentPhase = 0;
         try {
-            // Initialize Spec Kit if not already done
-            const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-            if (workspaceDir) {
-                await this.specKitManager.initializeSpecKit(workspaceDir);
+            // Get optimal strategy from meta-learning
+            const optimalStrategy = this.metaLearning?.getOptimalStrategy(this.categorizeProjectType(idea), this.estimateComplexity(idea));
+            if (optimalStrategy) {
+                console.log(`🧠 Using meta-learning optimized strategy: ${optimalStrategy.name}`);
+                // Apply strategy configuration to LLM manager
+                // This would configure agent count, rounds, etc.
             }
-            // Start with spec-driven approach (skip in test mode)
-            if (!this.testMode) {
-                await this.executeSpecDrivenWorkflow(idea, option);
+            // Enhance project idea with emergent behavior insights from vector context
+            let enhancedIdea = idea;
+            try {
+                const contextualInsights = await this.vectorDB.getContextualInsights(idea, {
+                    domain: this.extractDomain(idea),
+                    complexity: this.estimateComplexity(idea),
+                    requiredInnovation: this.isInnovativeProject(idea),
+                    behaviorPatterns: this.identifyBehaviorPatterns(idea)
+                });
+                if (contextualInsights.insights.dominantBehaviorType !== 'unknown') {
+                    console.log(`🔍 Found contextual insights: ${contextualInsights.insights.dominantBehaviorType} pattern detected`);
+                    enhancedIdea = `${idea} (Context: ${contextualInsights.insights.dominantBehaviorType}, Innovation: ${Math.round(contextualInsights.insights.averageInnovationIndex * 100)}%)`;
+                }
             }
-            let prompt = idea;
+            catch (error) {
+                console.warn('Failed to get contextual insights:', error);
+                // Continue with original idea if contextual enhancement fails
+            }
+            let prompt = enhancedIdea;
             if (option === 'letPanelDecide') {
-                prompt = await this.llmManager.conference(`Refine this project idea: ${idea}`);
+                prompt = await this.llmManager.conference(`Refine this project idea: ${enhancedIdea}`);
             }
             // Step 2: Conferencing
             const discussion = await this.llmManager.conference(`Discuss project: ${prompt}. Propose tech stack, estimates, plan.`);
-            this.buildPlan = await this.llmManager.voteOnDecision(discussion, ['Approve Plan', 'Need Questions']);
+            this.buildPlan = await this.llmManager.voteOnDecision(discussion, [
+                'Approve Plan',
+                'Need Questions',
+            ]);
             if (this.buildPlan === 'Need Questions') {
                 const questions = await this.llmManager.queryLLM(0, `Generate 5-10 questions for clarification on ${prompt}`);
                 const answers = await vscode.window.showInputBox({
-                    prompt: `Please answer these questions: ${questions}`
+                    prompt: `Please answer these questions: ${questions}`,
                 });
                 if (answers) {
                     this.buildPlan = await this.llmManager.conference(`Incorporate answers: ${answers}. Finalize plan.`);
@@ -200,7 +159,7 @@ export class WorkflowManager {
             this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'phase_started', {
                 phase,
                 timestamp: Date.now(),
-                projectIdea: this.projectIdea
+                projectIdea: this.projectIdea,
             });
             // Enhanced context retrieval using vector DB
             const contextQuery = `${phase} for ${this.projectIdea}`;
@@ -255,19 +214,24 @@ export class WorkflowManager {
     // Supporting methods for enhanced workflow
     async initializeCollaboration() {
         try {
-            if (this.testMode) {
-                console.log('Collaboration server skipped in test mode');
-                return;
-            }
-            // Use different port for testing to avoid conflicts
-            const port = process.env.NODE_ENV === 'test' ? 3000 + Math.floor(Math.random() * 1000) : 3001;
+            // Use a random port between 3000-4000 to avoid conflicts in tests
+            const port = process.env.NODE_ENV === 'test' ? 0 : 3001;
             this.collaborationServer = new CollaborationServer(port);
             await this.collaborationServer.start();
-            console.log(`Collaboration server initialized on port ${port}`);
+            console.log('Collaboration server initialized');
         }
         catch (error) {
             console.warn('Failed to start collaboration server:', error);
-            // Don't throw - collaboration server is optional
+        }
+    }
+    initializeMetaLearning() {
+        try {
+            const metaLearningComponents = createMetaLearningSystem();
+            this.metaLearning = new MetaLearningIntegration(metaLearningComponents);
+            console.log('🧠 Meta-learning system initialized');
+        }
+        catch (error) {
+            console.warn('Failed to initialize meta-learning system:', error);
         }
     }
     getCurrentWorkflowState() {
@@ -277,20 +241,29 @@ export class WorkflowManager {
             projectComplexity: this.estimateProjectComplexity(),
             userSatisfaction: this.calculateUserSatisfaction(),
             errorRate: this.metrics.errors / Math.max(1, this.metrics.iterations),
-            timeSpent: Math.min(1, totalTime / (1000 * 60 * 60)) // Normalize to hours
+            timeSpent: Math.min(1, totalTime / (1000 * 60 * 60)), // Normalize to hours
         };
     }
     estimateProjectComplexity() {
         // Simple heuristic based on project description and phases
         const ideaLength = this.projectIdea.length;
-        const complexityKeywords = ['api', 'database', 'authentication', 'real-time', 'machine learning', 'ai', 'blockchain'];
+        const complexityKeywords = [
+            'api',
+            'database',
+            'authentication',
+            'real-time',
+            'machine learning',
+            'ai',
+            'blockchain',
+        ];
         const matches = complexityKeywords.filter(keyword => this.projectIdea.toLowerCase().includes(keyword)).length;
         return Math.min(1, (ideaLength / 500 + matches / complexityKeywords.length) / 2);
     }
     calculateUserSatisfaction() {
         if (this.metrics.userFeedback.length === 0)
             return 0.7; // Default neutral
-        return this.metrics.userFeedback.reduce((sum, rating) => sum + rating, 0) / this.metrics.userFeedback.length;
+        return (this.metrics.userFeedback.reduce((sum, rating) => sum + rating, 0) /
+            this.metrics.userFeedback.length);
     }
     async applyRLAction(action, phase) {
         switch (action.type) {
@@ -324,7 +297,8 @@ export class WorkflowManager {
         processed = `# ${phase} Phase Output\n\n*Generated: ${new Date().toISOString()}*\n\n${processed}`;
         // Validate output based on phase
         if (phase === 'Planning' && !processed.includes('architecture')) {
-            processed += '\n\n## Architecture Notes\n*Architecture details should be included in planning phase.*';
+            processed +=
+                '\n\n## Architecture Notes\n*Architecture details should be included in planning phase.*';
         }
         return processed;
     }
@@ -361,10 +335,15 @@ export class WorkflowManager {
         return await this.llmManager.queryLLM(0, suggestionPrompt);
     }
     async getUserDecision(suggestions, review) {
-        const options = ['Proceed as planned', 'Apply suggestions', 'Request modifications', 'Get more details'];
+        const options = [
+            'Proceed as planned',
+            'Apply suggestions',
+            'Request modifications',
+            'Get more details',
+        ];
         const choice = await vscode.window.showQuickPick(options, {
             placeHolder: `Review: ${review.substring(0, 100)}... | Suggestions: ${suggestions.substring(0, 100)}...`,
-            canPickMany: false
+            canPickMany: false,
         });
         return choice || 'Proceed as planned';
     }
@@ -383,7 +362,7 @@ export class WorkflowManager {
             case 'Request modifications': {
                 feedback = 0.5;
                 const modification = await vscode.window.showInputBox({
-                    prompt: 'What modifications would you like?'
+                    prompt: 'What modifications would you like?',
                 });
                 if (modification) {
                     const modifiedOutput = await this.llmManager.conference(`Apply these modifications: ${modification} to: ${output}`);
@@ -407,7 +386,7 @@ export class WorkflowManager {
             content: output,
             review,
             timestamp: Date.now(),
-            projectIdea: this.projectIdea
+            projectIdea: this.projectIdea,
         };
         const embedding = await this.vectorDB.getEmbedding(`${phase} ${this.projectIdea} ${output.substring(0, 500)}`);
         await this.vectorDB.addEmbedding(`phase_${phase}_${Date.now()}`, embedding, contextData);
@@ -478,15 +457,175 @@ ${bonuses}
                 const doc = await vscode.workspace.openTextDocument(reportPath);
                 await vscode.window.showTextDocument(doc);
             }
+            // Record project completion in meta-learning system
+            const projectType = this.categorizeProjectType(this.projectIdea);
+            const complexity = this.estimateComplexity(this.projectIdea);
+            await this.metaLearning?.recordProjectAndAnalyze(`project_${Date.now()}`, projectType, complexity, this.extractTechnologies(this.projectIdea), 1, // teamSize (could be enhanced to track actual team size)
+            Math.round(totalTime / 1000 / 60), // duration in minutes
+            this.metrics.errors === 0, // success
+            this.calculateUserSatisfaction(), // aiCollaborationScore (using user satisfaction as proxy)
+            this.calculateUserSatisfaction(), // userSatisfaction
+            {
+                phasesCompleted: this.currentPhase,
+                iterations: this.metrics.iterations,
+                errors: this.metrics.errors,
+                rlStats,
+                buildPlan: this.buildPlan
+            });
             // Notify collaboration server
             this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'project_completed', {
                 projectIdea: this.projectIdea,
                 metrics: this.metrics,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         }
         catch (error) {
             vscode.window.showErrorMessage(`Project completion failed: ${error.message}`);
+        }
+    }
+    // Meta-learning helper methods
+    categorizeProjectType(idea) {
+        return this.determineProjectType(idea.toLowerCase());
+    }
+    determineProjectType(lowerIdea) {
+        const projectTypeMap = {
+            'web': 'web',
+            'website': 'web',
+            'frontend': 'web',
+            'mobile': 'mobile',
+            'ios': 'mobile',
+            'android': 'mobile',
+            'backend': 'backend',
+            'api': 'backend',
+            'server': 'backend',
+            'ai': 'ai',
+            'machine learning': 'ai',
+            'neural': 'ai',
+            'blockchain': 'blockchain',
+            'crypto': 'blockchain',
+            'smart contract': 'blockchain',
+            'game': 'game',
+            'gaming': 'game',
+            'unity': 'game',
+            'desktop': 'desktop',
+            'electron': 'desktop',
+            'app': 'desktop'
+        };
+        for (const [keyword, type] of Object.entries(projectTypeMap)) {
+            if (lowerIdea.includes(keyword)) {
+                return type;
+            }
+        }
+        return 'fullstack'; // Default
+    }
+    estimateComplexity(idea) {
+        const lowerIdea = idea.toLowerCase();
+        let complexity = 0.1; // Base complexity
+        // Technology complexity factors
+        const complexityKeywords = {
+            high: ['machine learning', 'neural network', 'computer vision', 'natural language', 'blockchain', 'microservices', 'real-time', 'distributed', 'kubernetes', 'docker'],
+            medium: ['authentication', 'database', 'payment', 'websocket', 'api', 'integration', 'testing'],
+            low: ['static', 'simple', 'basic', 'crud', 'form']
+        };
+        for (const keyword of complexityKeywords.high) {
+            if (lowerIdea.includes(keyword))
+                complexity += 0.2;
+        }
+        for (const keyword of complexityKeywords.medium) {
+            if (lowerIdea.includes(keyword))
+                complexity += 0.1;
+        }
+        for (const keyword of complexityKeywords.low) {
+            if (lowerIdea.includes(keyword))
+                complexity -= 0.05;
+        }
+        // Length-based complexity
+        if (idea.length > 500)
+            complexity += 0.1;
+        if (idea.length > 1000)
+            complexity += 0.1;
+        // Technology stack complexity
+        const techCount = this.extractTechnologies(idea).length;
+        complexity += Math.min(techCount * 0.05, 0.2);
+        return Math.min(complexity, 1.0); // Cap at 1.0
+    }
+    extractTechnologies(idea) {
+        const lowerIdea = idea.toLowerCase();
+        const technologies = [];
+        const techMap = {
+            'react': ['react', 'jsx', 'next.js', 'remix', 'vite'],
+            'vue': ['vue', 'nuxt', 'vue.js'],
+            'angular': ['angular', 'ng'],
+            'nodejs': ['node', 'nodejs', 'express', 'fastify', 'koa'],
+            'python': ['python', 'django', 'flask', 'fastapi'],
+            'typescript': ['typescript', 'ts'],
+            'javascript': ['javascript', 'js'],
+            'database': ['mongodb', 'postgresql', 'mysql', 'redis', 'sqlite'],
+            'cloud': ['aws', 'azure', 'gcp', 'vercel', 'netlify'],
+            'mobile': ['react native', 'flutter', 'ios', 'android', 'swift', 'kotlin'],
+            'blockchain': ['ethereum', 'solidity', 'web3', 'smart contract'],
+            'ai': ['openai', 'gpt', 'claude', 'machine learning', 'tensorflow', 'pytorch']
+        };
+        for (const [tech, keywords] of Object.entries(techMap)) {
+            if (keywords.some(keyword => lowerIdea.includes(keyword))) {
+                technologies.push(tech);
+            }
+        }
+        return technologies;
+    }
+    // Enhanced vector context helper methods
+    extractDomain(idea) {
+        return this.getDomainFromIdea(idea.toLowerCase());
+    }
+    getDomainFromIdea(lowerIdea) {
+        const domainMap = {
+            'web': 'Web Development',
+            'frontend': 'Web Development',
+            'react': 'Web Development',
+            'mobile': 'Mobile Development',
+            'ios': 'Mobile Development',
+            'android': 'Mobile Development',
+            'ai': 'AI/ML',
+            'machine learning': 'AI/ML',
+            'blockchain': 'Blockchain',
+            'crypto': 'Blockchain',
+            'game': 'Game Development',
+            'gaming': 'Game Development',
+            'data': 'Data Science',
+            'database': 'Data Science'
+        };
+        for (const [keyword, domain] of Object.entries(domainMap)) {
+            if (lowerIdea.includes(keyword)) {
+                return domain;
+            }
+        }
+        return 'General Development';
+    }
+    isInnovativeProject(idea) {
+        const lowerIdea = idea.toLowerCase();
+        const innovationKeywords = [
+            'innovative', 'novel', 'creative', 'breakthrough', 'revolutionary',
+            'unique', 'original', 'pioneering', 'groundbreaking', 'transformative',
+            'cutting-edge', 'next-generation', 'disruptive'
+        ];
+        return innovationKeywords.some(keyword => lowerIdea.includes(keyword));
+    }
+    identifyBehaviorPatterns(idea) {
+        return this.analyzeBehaviorPatterns(idea.toLowerCase());
+    }
+    analyzeBehaviorPatterns(lowerIdea) {
+        const patterns = [];
+        this.addPatternIfMatches(patterns, lowerIdea, ['collaborative', 'team', 'multi-user'], 'collaboration');
+        this.addPatternIfMatches(patterns, lowerIdea, ['optimization', 'performance', 'efficient'], 'optimization');
+        this.addPatternIfMatches(patterns, lowerIdea, ['adaptive', 'learning', 'intelligent'], 'adaptation');
+        if (this.isInnovativeProject(lowerIdea)) {
+            patterns.push('innovation');
+        }
+        return patterns.length > 0 ? patterns : ['collaboration']; // Default to collaboration
+    }
+    addPatternIfMatches(patterns, content, keywords, patternName) {
+        if (keywords.some(keyword => content.includes(keyword))) {
+            patterns.push(patternName);
         }
     }
 }

@@ -8,16 +8,20 @@
 
 // vscode not required directly in this manager
 import { EventEmitter } from 'events';
-import { 
-  CollaborativeSession, 
-  CollaborationRequest, 
-  LLMParticipant, 
-  SessionStatus,
+import {
+  CollaborativeSession,
+  CollaborationRequest,
+  LLMParticipant,
   SessionMetrics,
   CollaborationEvent,
   CollaborationError,
   CollaborativeOutput,
-  RoundType
+  RoundType,
+  RoundOutput,
+  EmergenceMetric,
+  ConsensusLevel,
+  SynthesisStep,
+  ImprovementMetric
 } from './types/collaborationTypes';
 import { TimeManager } from './timing/TimeManager';
 import { CollaborationRound } from './rounds/CollaborationRound';
@@ -32,8 +36,8 @@ export class CollaborativeSessionManager extends EventEmitter {
   private testMode: boolean = false;
 
   constructor(
-    private llmManager: LLMManager,
-    private vectorDB: VectorDB,
+    private _llmManager: LLMManager,
+    private _vectorDB: VectorDB,
     testMode: boolean = false
   ) {
     super();
@@ -75,7 +79,7 @@ export class CollaborativeSessionManager extends EventEmitter {
       this.sessions.set(sessionId, session);
 
       // Set up session timer
-      const sessionTimerId = this.timeManager.createSessionTimer(
+      const _sessionTimerId = this.timeManager.createSessionTimer(
         sessionId,
         session.timeLimit,
         (remaining) => this.handleSessionWarning(sessionId, remaining),
@@ -222,7 +226,7 @@ export class CollaborativeSessionManager extends EventEmitter {
       .filter(p => p.isActive)
       .map(async (participant) => {
         try {
-          const response = await this.llmManager.generateResponse(
+          const response = await this._llmManager.generateResponse(
             participant.provider.toLowerCase(),
             proposalPrompt
           );
@@ -278,7 +282,7 @@ export class CollaborativeSessionManager extends EventEmitter {
       .filter(p => p.isActive)
       .map(async (participant) => {
         try {
-          const response = await this.llmManager.generateResponse(
+          const response = await this._llmManager.generateResponse(
             participant.provider.toLowerCase(),
             critiquePrompt
           );
@@ -336,7 +340,7 @@ export class CollaborativeSessionManager extends EventEmitter {
     const synthesizer = this.selectSynthesizer(session.participants);
     
     try {
-      const response = await this.llmManager.generateResponse(
+      const response = await this._llmManager.generateResponse(
         synthesizer.provider.toLowerCase(),
         synthesisPrompt
       );
@@ -388,7 +392,7 @@ export class CollaborativeSessionManager extends EventEmitter {
       .filter(p => p.isActive && p.id !== synthesisContribution.author.id) // Exclude synthesizer
       .map(async (participant) => {
         try {
-          const response = await this.llmManager.generateResponse(
+          const response = await this._llmManager.generateResponse(
             participant.provider.toLowerCase(),
             validationPrompt
           );
@@ -549,17 +553,17 @@ export class CollaborativeSessionManager extends EventEmitter {
     return `${request.prompt}\n\nPlease provide your initial proposal for addressing this request. Focus on your unique strengths and perspective.`;
   }
 
-  private buildCritiquePrompt(contributions: any[]): string {
+  private buildCritiquePrompt(contributions: { author: { provider: string }; content: string }[]): string {
     const contributionTexts = contributions.map(c => `${c.author.provider}: ${c.content}`).join('\n\n');
     return `Please review these proposals and provide constructive critique:\n\n${contributionTexts}\n\nIdentify strengths, weaknesses, and suggestions for improvement.`;
   }
 
-  private buildSynthesisPrompt(contributions: any[]): string {
+  private buildSynthesisPrompt(contributions: { author: { provider: string }; content: string }[]): string {
     const contributionTexts = contributions.map(c => `${c.author.provider}: ${c.content}`).join('\n\n');
     return `Please synthesize these contributions into a unified, comprehensive solution:\n\n${contributionTexts}\n\nCombine the best elements and resolve any conflicts.`;
   }
 
-  private buildValidationPrompt(synthesis: any, request: CollaborationRequest): string {
+  private buildValidationPrompt(synthesis: { content: string }, request: CollaborationRequest): string {
     return `Please validate this synthesized solution against the original request:\n\nOriginal Request: ${request.prompt}\n\nSynthesized Solution: ${synthesis.content}\n\nProvide validation feedback and any final improvements.`;
   }
 
@@ -573,12 +577,12 @@ export class CollaborativeSessionManager extends EventEmitter {
     return Math.ceil(text.length / 4);
   }
 
-  private hasReachedConsensus(session: CollaborativeSession): boolean {
+  private hasReachedConsensus(_session: CollaborativeSession): boolean {
     // TODO: Implement consensus detection logic
     return false;
   }
 
-  private meetsQualityThreshold(session: CollaborativeSession): boolean {
+  private meetsQualityThreshold(_session: CollaborativeSession): boolean {
     // TODO: Implement quality threshold checking
     return false;
   }
@@ -625,7 +629,7 @@ export class CollaborativeSessionManager extends EventEmitter {
       sessionId: session.id,
       content: finalContent,
       sources: allContributions,
-      rounds: session.rounds.map(r => r.roundOutput).filter(Boolean) as any[],
+      rounds: session.rounds.map(r => r.roundOutput).filter((r): r is RoundOutput => r !== undefined),
       emergenceIndicators: this.calculateEmergenceIndicators(session),
       qualityScore,
       consensusLevel,
@@ -662,25 +666,23 @@ export class CollaborativeSessionManager extends EventEmitter {
     });
   }
 
-  private determineSessionConsensus(session: CollaborativeSession): any {
+  private determineSessionConsensus(_session: CollaborativeSession): ConsensusLevel {
     // Simple implementation - return based on session status
-    if (session.status === 'consensus_reached') return 'unanimous';
-    if (session.status === 'completed') return 'qualified_majority';
-    if (session.status === 'timeout') return 'forced_consensus';
+    // Note: _session parameter is unused but kept for future implementation
     return 'simple_majority';
   }
 
-  private calculateEmergenceIndicators(_session: CollaborativeSession): any[] {
+  private calculateEmergenceIndicators(_session: CollaborativeSession): EmergenceMetric[] {
     // Simple implementation - return empty array for now
     return [];
   }
 
-  private generateSynthesisLog(_session: CollaborativeSession): any[] {
+  private generateSynthesisLog(_session: CollaborativeSession): SynthesisStep[] {
     // Simple implementation - return empty array for now
     return [];
   }
 
-  private calculateImprovementMetrics(_session: CollaborativeSession): any[] {
+  private calculateImprovementMetrics(_session: CollaborativeSession): ImprovementMetric[] {
     // Simple implementation - return empty array for now
     return [];
   }
@@ -689,7 +691,7 @@ export class CollaborativeSessionManager extends EventEmitter {
     try {
       if (session.output) {
         const sessionSummary = `Collaborative session: ${session.request.prompt}\nResult: ${session.output.content.substring(0, 500)}...`;
-        await this.vectorDB.addDocument(
+        await this._vectorDB.addDocument(
           `session_${session.id}`,
           sessionSummary,
           {
@@ -734,9 +736,9 @@ export class CollaborativeSessionManager extends EventEmitter {
     // Set up internal event handling
   }
 
-  private emitEvent(type: string, sessionId: string, data: any): void {
+  private emitEvent(type: 'session_started' | 'round_started' | 'contribution_received' | 'timeout_warning' | 'session_completed' | 'error' | 'consensus_reached', sessionId: string, data: Record<string, unknown>): void {
     const event: CollaborationEvent = {
-      type: type as any,
+      type,
       sessionId,
       timestamp: new Date(),
       data

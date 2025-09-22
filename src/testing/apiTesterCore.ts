@@ -1,8 +1,18 @@
 import { LLMManager } from '../llm/llmManager.js';
 import { VectorDB } from '../db/vectorDB.js';
-import * as vscode from 'vscode';
+import * as _vscode from 'vscode';
 
 export interface TestResult {
+  success: boolean;
+  response?: string;
+  error?: string;
+  latency: number;
+  timestamp: number;
+  provider: string;
+  model?: string;
+}
+
+export interface _TestResult {
   success: boolean;
   response?: string;
   error?: string;
@@ -21,7 +31,27 @@ export interface BatchTestResult {
   totalTime: number;
 }
 
+export interface _BatchTestResult {
+  total: number;
+  successful: number;
+  failed: number;
+  results: TestResult[];
+  averageLatency: number;
+  totalTime: number;
+}
+
 export interface VectorTestResult {
+  success: boolean;
+  results: Array<{
+    id: string;
+    similarity: number;
+    metadata: any;
+  }>;
+  query: string;
+  latency: number;
+}
+
+export interface _VectorTestResult {
   success: boolean;
   results: Array<{
     id: string;

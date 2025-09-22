@@ -1,16 +1,27 @@
 {
   "name": "astraforge-ide",
-  "displayName": "AstraForge IDE",
-  "description": "AI-powered self-improving IDE extension",
-  "version": "0.0.1",
-  "type": "module",
+  "displayName": "AstraForge IDE V2 🚀✨",
+  "description": "Revolutionary V2: Complete self-evolving AI ecosystem with quantum algorithms, emergent behavior, recursive self-modification, and inter-agent evolution",
+  "version": "2.0.0",
+  "publisher": "astraforge",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.102.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/astraforge/astraforge-ide.git"
   },
   "categories": [
     "Extension Packs"
   ],
   "main": "./out/extension.js",
+  "files": [
+    "out/**/*",
+    "media/**/*",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
   "contributes": {
     "views": {
       "explorer": [
@@ -21,6 +32,26 @@
         {
           "id": "astraforge.apiTester",
           "name": "API Tester"
+        },
+        {
+          "id": "astraforge.metaLearning",
+          "name": "🧠 Meta-Learning"
+        },
+        {
+          "id": "astraforge.emergentBehavior",
+          "name": "🌟 Emergent Behavior"
+        },
+        {
+          "id": "astraforge.quantumDecision",
+          "name": "🔮 Quantum Decision Making"
+        },
+        {
+          "id": "astraforge.agentEvolution",
+          "name": "🧬 Agent Evolution"
+        },
+        {
+          "id": "astraforge.selfModification",
+          "name": "⚙️ Self-Modification"
         }
       ]
     },
@@ -28,6 +59,51 @@
       {
         "command": "astraforge.testAPIs",
         "title": "Test APIs",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.showMetaLearning",
+        "title": "Show Meta-Learning Dashboard",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.showEmergentBehavior",
+        "title": "Show Emergent Behavior Dashboard",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.showQuantumDecision",
+        "title": "Show Quantum Decision Making Dashboard",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.showAgentEvolution",
+        "title": "Show Agent Evolution Dashboard",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.showSelfModification",
+        "title": "Show Self-Modification Dashboard",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.evolveAgents",
+        "title": "Evolve Agent Population",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.specializeAgents",
+        "title": "Specialize Agents",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.transferKnowledge",
+        "title": "Transfer Knowledge Between Agents",
+        "category": "AstraForge"
+      },
+      {
+        "command": "astraforge.optimizeEvolution",
+        "title": "Optimize Evolution Parameters",
         "category": "AstraForge"
       }
     ]
@@ -46,6 +122,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"*.{js,json,md}\"",
     "type-check": "tsc --noEmit",
     "test:api": "node out/testing/apiTesterCLI.js",
+    "test:codacy": "node scripts/run-codacy-tests.cjs",
     "package": "vsce package",
     "clean": "rimraf out dist coverage .nyc_output"
   },
@@ -71,6 +148,7 @@
     "@huggingface/inference": "^4.6.1",
     "axios": "^1.11.0",
     "commander": "^14.0.0",
+    "dotenv": "^16.3.1",
     "express": "^4.18.1",
     "simple-git": "^3.19.1",
     "socket.io": "^4.7.1",

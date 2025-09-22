@@ -4,6 +4,7 @@
  * Each round has a specific purpose (propose, critique, synthesize, validate)
  * and manages the collection and processing of contributions from LLM participants.
  */
+import { logger } from '../../utils/logger';
 export class CollaborationRound {
     constructor(sessionId, roundNumber, type, purpose, timeLimit) {
         this.contributions = [];
@@ -25,7 +26,7 @@ export class CollaborationRound {
         }
         contribution.roundId = this.id;
         this.contributions.push(contribution);
-        console.log(`📝 Added contribution from ${contribution.author.provider} to round ${this.type}`);
+        logger.debug(`📝 Added contribution from ${contribution.author.provider} to round ${this.type}`);
     }
     /**
      * Get contributions by participant
@@ -139,7 +140,7 @@ export class CollaborationRound {
             return this.contributions[0].content;
         }
         // Simple synthesis - can be enhanced with LLM-powered synthesis
-        const contributionSummaries = this.contributions.map((c, index) => `**${c.author.provider}** (Confidence: ${c.confidence}%): ${c.content.substring(0, 200)}...`);
+        const contributionSummaries = this.contributions.map((c, _index) => `**${c.author.provider}** (Confidence: ${c.confidence}%): ${c.content.substring(0, 200)}...`);
         return `**${this.type.toUpperCase()} ROUND SYNTHESIS**\n\n${contributionSummaries.join('\n\n')}`;
     }
     /**
@@ -193,11 +194,11 @@ export class CollaborationRound {
         this.status = 'completed';
         this.endTime = new Date();
         const output = this.generateRoundOutput();
-        console.log(`✅ Round ${this.type} completed:`);
-        console.log(`   Duration: ${Math.round(this.getDuration() / 1000)}s`);
-        console.log(`   Contributions: ${this.contributions.length}`);
-        console.log(`   Quality Score: ${output.qualityScore}`);
-        console.log(`   Consensus: ${output.consensusLevel}`);
+        logger.info(`✅ Round ${this.type} completed:`);
+        logger.debug(`   Duration: ${Math.round(this.getDuration() / 1000)}s`);
+        logger.debug(`   Contributions: ${this.contributions.length}`);
+        logger.debug(`   Quality Score: ${output.qualityScore}`);
+        logger.debug(`   Consensus: ${output.consensusLevel}`);
         return output;
     }
     /**
@@ -207,9 +208,9 @@ export class CollaborationRound {
         this.status = 'timeout';
         this.endTime = new Date();
         const output = this.generateRoundOutput();
-        console.log(`⏰ Round ${this.type} timed out:`);
-        console.log(`   Partial contributions: ${this.contributions.length}`);
-        console.log(`   Quality Score: ${output.qualityScore}`);
+        logger.warn(`⏰ Round ${this.type} timed out:`);
+        logger.debug(`   Partial contributions: ${this.contributions.length}`);
+        logger.debug(`   Quality Score: ${output.qualityScore}`);
         return output;
     }
 }

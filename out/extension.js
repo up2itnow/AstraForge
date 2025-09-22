@@ -8,6 +8,8 @@ let llmManager;
 let vectorDB;
 let workflowManager;
 let gitManager;
+let metaLearningProvider;
+let emergentBehaviorSystem;
 export async function activate(context) {
     console.log('AstraForge IDE activated! Launching into the stratosphere...');
     // Register providers immediately but lazy-load heavy modules
@@ -46,6 +48,23 @@ async function registerProviders(context) {
             return provider.resolveWebviewView(webviewView, context, token);
         },
     }));
+    // Meta-Learning Dashboard - register immediately for insights access
+    const getMetaLearningProvider = async () => {
+        if (!metaLearningProvider) {
+            const { MetaLearningProvider } = await import('./meta-learning');
+            const { createMetaLearningSystem } = await import('./meta-learning');
+            const metaLearningComponents = createMetaLearningSystem();
+            const integration = new (await import('./meta-learning')).MetaLearningIntegration(metaLearningComponents);
+            metaLearningProvider = new MetaLearningProvider(context.extensionUri, integration);
+        }
+        return metaLearningProvider;
+    };
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider('astraforge.metaLearning', {
+        resolveWebviewView: async (webviewView, context, token) => {
+            const provider = await getMetaLearningProvider();
+            return provider.resolveWebviewView(webviewView, context, token);
+        },
+    }));
 }
 /**
  * Register extension commands
@@ -76,6 +95,10 @@ function registerCommands(context) {
         await ensureLLMManager();
         const stats = llmManager.getCacheStats();
         vscode.window.showInformationMessage(`Cache Stats - Size: ${stats.cacheSize}, Throttled: ${stats.throttleEntries}`);
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('astraforge.showMetaLearning', async () => {
+        await vscode.commands.executeCommand('workbench.view.extension.astraforge-activitybar');
+        // The MetaLearningProvider will handle the webview display
     }));
 }
 /**
@@ -109,7 +132,8 @@ async function ensureLLMManager() {
 async function ensureVectorDB(context) {
     if (!vectorDB) {
         const { VectorDB } = await import('./db/vectorDB');
-        vectorDB = new VectorDB(context.extensionUri.fsPath);
+        const emergentBehavior = await ensureEmergentBehaviorSystem();
+        vectorDB = new VectorDB(context.extensionUri.fsPath, emergentBehavior);
         await vectorDB.init();
     }
     return vectorDB;
@@ -125,13 +149,41 @@ async function ensureGitManager() {
     return gitManager;
 }
 /**
+ * Lazy-load Emergent Behavior System
+ */
+async function ensureEmergentBehaviorSystem() {
+    if (!emergentBehaviorSystem) {
+        const { createEmergentBehaviorSystem } = await import('./emergent-behavior');
+        const { MetaLearningSystem } = await import('./meta-learning');
+        // Initialize meta-learning first if needed
+        let metaLearning;
+        try {
+            const { createMetaLearningSystem } = await import('./meta-learning');
+            const metaComponents = createMetaLearningSystem();
+            const { MetaLearningIntegration } = await import('./meta-learning');
+            metaLearning = new MetaLearningIntegration(metaComponents);
+        }
+        catch (error) {
+            console.warn('Meta-learning system not available for emergent behavior:', error);
+        }
+        const behaviorComponents = createEmergentBehaviorSystem(metaLearning);
+        emergentBehaviorSystem = behaviorComponents.emergentBehaviorSystem;
+    }
+    return emergentBehaviorSystem;
+}
+/**
  * Lazy-load Workflow Manager (depends on other managers)
  */
 async function ensureWorkflowManager(context) {
     if (!workflowManager) {
-        await Promise.all([ensureLLMManager(), ensureVectorDB(context), ensureGitManager()]);
+        await Promise.all([
+            ensureLLMManager(),
+            ensureVectorDB(context),
+            ensureGitManager(),
+            ensureEmergentBehaviorSystem()
+        ]);
         const { WorkflowManager } = await import('./workflow/workflowManager');
-        workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
+        workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager, emergentBehaviorSystem);
     }
     return workflowManager;
 }

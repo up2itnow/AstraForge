@@ -46,7 +46,7 @@ export class AnthropicProvider extends BaseLLMProvider {
     }
   }
 
-  async getAvailableModels(config: LLMConfig): Promise<string[]> {
+  async getAvailableModels(_config: LLMConfig): Promise<string[]> {
     // Anthropic doesn't provide a models endpoint, return known models
     return [
       'claude-3-opus-20240229',

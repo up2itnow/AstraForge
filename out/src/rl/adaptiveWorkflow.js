@@ -16,22 +16,14 @@ export class AdaptiveWorkflowRL {
             { type: 'skip', confidence: 0.8 },
             { type: 'repeat', confidence: 0.9 },
             { type: 'branch', target: 'Testing', confidence: 0.7 },
-            { type: 'optimize', confidence: 0.6 }
+            { type: 'optimize', confidence: 0.6 },
         ];
         this.loadQTable();
-        // Ensure deterministic behavior in tests to avoid flaky results
-        if (process.env.NODE_ENV === 'test') {
-            this.explorationRate = 0;
-        }
     }
     /**
      * Get the best action for a given state using epsilon-greedy policy
      */
     getBestAction(state) {
-        // Guard against invalid or malformed state inputs
-        if (!state || typeof state.currentPhase !== 'string') {
-            return this.getRandomAction();
-        }
         const stateKey = this.serializeState(state);
         // Epsilon-greedy exploration
         if (Math.random() < this.explorationRate) {
@@ -40,8 +32,7 @@ export class AdaptiveWorkflowRL {
         // Get best known action
         const stateActions = this.qTable.get(stateKey);
         if (!stateActions || stateActions.size === 0) {
-            // Deterministic fallback for consistency in tests
-            return this.actions[0];
+            return this.getRandomAction();
         }
         let bestAction = this.actions[0];
         let bestQValue = -Infinity;
@@ -72,7 +63,7 @@ export class AdaptiveWorkflowRL {
                 state: stateKey,
                 action: actionKey,
                 qValue: 0,
-                visits: 0
+                visits: 0,
             });
         }
         const entry = stateActions.get(actionKey);
@@ -102,76 +93,111 @@ export class AdaptiveWorkflowRL {
      */
     calculateReward(oldState, action, newState, phaseSuccess, userFeedback) {
         let reward = 0;
-        // Base reward for phase success
-        if (phaseSuccess) {
-            reward += 1.0;
-        }
-        else {
-            reward -= 0.5;
-        }
-        // Reward for improving user satisfaction
+        reward += this.calculateBaseReward(phaseSuccess);
+        reward += this.calculateSatisfactionReward(oldState, newState);
+        reward += this.calculateErrorPenalty(oldState, newState);
+        reward += this.calculateEfficiencyReward(oldState, newState, phaseSuccess);
+        reward += this.calculateActionSpecificReward(action, oldState, newState, phaseSuccess);
+        reward += this.calculateUserFeedbackReward(userFeedback);
+        return Math.max(-2.0, Math.min(2.0, reward)); // Clamp reward between -2 and +2
+    }
+    /**
+     * Calculate base reward for phase success
+     */
+    calculateBaseReward(phaseSuccess) {
+        return phaseSuccess ? 1.0 : -0.5;
+    }
+    /**
+     * Calculate reward for user satisfaction improvement
+     */
+    calculateSatisfactionReward(oldState, newState) {
         const satisfactionImprovement = newState.userSatisfaction - oldState.userSatisfaction;
-        reward += satisfactionImprovement * 2.0;
-        // Penalty for increasing error rate
+        return satisfactionImprovement * 2.0;
+    }
+    /**
+     * Calculate penalty for error rate increase
+     */
+    calculateErrorPenalty(oldState, newState) {
         const errorIncrease = newState.errorRate - oldState.errorRate;
-        reward -= errorIncrease * 1.5;
-        // Reward for efficient time usage
+        return -(errorIncrease * 1.5);
+    }
+    /**
+     * Calculate reward for efficient time usage
+     */
+    calculateEfficiencyReward(oldState, newState, phaseSuccess) {
         if (newState.timeSpent < oldState.timeSpent && phaseSuccess) {
-            reward += 0.3;
+            return 0.3;
         }
-        // Action-specific rewards
+        return 0;
+    }
+    /**
+     * Calculate action-specific rewards
+     */
+    calculateActionSpecificReward(action, oldState, newState, phaseSuccess) {
         switch (action.type) {
             case 'continue':
-                if (phaseSuccess && newState.userSatisfaction > 0.7) {
-                    reward += 0.2;
-                }
-                break;
+                return this.calculateContinueReward(phaseSuccess, newState);
             case 'skip':
-                if (oldState.projectComplexity < 0.3 && phaseSuccess) {
-                    reward += 0.4; // Good to skip for simple projects
-                }
-                else {
-                    reward -= 0.3; // Risky for complex projects
-                }
-                break;
+                return this.calculateSkipReward(oldState, phaseSuccess);
             case 'repeat':
-                if (oldState.errorRate > 0.5 && newState.errorRate < oldState.errorRate) {
-                    reward += 0.5; // Good decision to repeat when there were errors
-                }
-                break;
+                return this.calculateRepeatReward(oldState, newState);
             case 'optimize':
-                if (newState.timeSpent < oldState.timeSpent * 0.8) {
-                    reward += 0.6; // Significant time improvement
-                }
-                break;
+                return this.calculateOptimizeReward(oldState, newState);
+            default:
+                return 0;
         }
-        // User feedback integration
+    }
+    calculateContinueReward(phaseSuccess, newState) {
+        if (phaseSuccess && newState.userSatisfaction > 0.7) {
+            return 0.2;
+        }
+        return 0;
+    }
+    calculateSkipReward(oldState, phaseSuccess) {
+        if (oldState.projectComplexity < 0.3 && phaseSuccess) {
+            return 0.4; // Good to skip for simple projects
+        }
+        else {
+            return -0.3; // Risky for complex projects
+        }
+    }
+    calculateRepeatReward(oldState, newState) {
+        if (oldState.errorRate > 0.5 && newState.errorRate < oldState.errorRate) {
+            return 0.5; // Good decision to repeat when there were errors
+        }
+        return 0;
+    }
+    calculateOptimizeReward(oldState, newState) {
+        if (newState.timeSpent < oldState.timeSpent * 0.8) {
+            return 0.6; // Significant time improvement
+        }
+        return 0;
+    }
+    /**
+     * Calculate reward from user feedback
+     */
+    calculateUserFeedbackReward(userFeedback) {
         if (userFeedback !== undefined) {
-            reward += (userFeedback - 0.5) * 2.0; // Scale 0-1 feedback to -1 to +1
+            return (userFeedback - 0.5) * 2.0; // Scale 0-1 feedback to -1 to +1
         }
-        // Normalize to 0..1 for stable testing and bounded learning
-        const clamped = Math.max(-2.0, Math.min(2.0, reward));
-        return (clamped + 2) / 4; // maps [-2,2] -> [0,1]
+        return 0;
     }
     getRandomAction() {
         return this.actions[Math.floor(Math.random() * this.actions.length)];
     }
     serializeState(state) {
-        // Defensive serialization to tolerate malformed inputs in tests/runtime
-        const safePhase = typeof state?.currentPhase === 'string' ? state.currentPhase : 'unknown';
-        const toNum = (v, fallback = 0) => (typeof v === 'number' && isFinite(v) ? v : fallback);
         return JSON.stringify({
-            phase: safePhase,
-            complexity: Math.round(toNum(state?.projectComplexity, 0) * 10) / 10,
-            satisfaction: Math.round(toNum(state?.userSatisfaction, 0.5) * 10) / 10,
-            errorRate: Math.round(toNum(state?.errorRate, 0) * 10) / 10,
-            timeNorm: Math.round(toNum(state?.timeSpent, 0) * 10) / 10
+            phase: state.currentPhase,
+            complexity: Math.round(state.projectComplexity * 10) / 10,
+            satisfaction: Math.round(state.userSatisfaction * 10) / 10,
+            errorRate: Math.round(state.errorRate * 10) / 10,
+            timeNorm: Math.round(state.timeSpent * 10) / 10,
         });
     }
     serializeAction(action) {
         return JSON.stringify({
             type: action.type,
-            target: action.target || null
+            target: action.target || null,
         });
     }
     deserializeAction(actionKey) {
@@ -179,7 +205,7 @@ export class AdaptiveWorkflowRL {
         return {
             type: parsed.type,
             target: parsed.target,
-            confidence: 0.8 // Default confidence for deserialized actions
+            confidence: 0.8, // Default confidence for deserialized actions
         };
     }
     saveQTable() {
@@ -189,8 +215,8 @@ export class AdaptiveWorkflowRL {
                 actions: Array.from(actions.entries()).map(([actionKey, entry]) => ({
                     action: actionKey,
                     qValue: entry.qValue,
-                    visits: entry.visits
-                }))
+                    visits: entry.visits,
+                })),
             }));
             // Store in memory for now - in VS Code extension, this would use vscode.ExtensionContext.globalState
             global.astraforge_qtable = serialized;
@@ -213,7 +239,7 @@ export class AdaptiveWorkflowRL {
                         state: stateData.state,
                         action: actionData.action,
                         qValue: actionData.qValue,
-                        visits: actionData.visits
+                        visits: actionData.visits,
                     });
                 }
                 this.qTable.set(stateData.state, stateActions);
@@ -235,7 +261,7 @@ export class AdaptiveWorkflowRL {
         return {
             totalStates: this.qTable.size,
             totalActions,
-            explorationRate: this.explorationRate
+            explorationRate: this.explorationRate,
         };
     }
 }

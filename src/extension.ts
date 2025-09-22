@@ -4,15 +4,18 @@
  */
 
 import * as vscode from 'vscode';
+import { logger } from './utils/logger';
 
 // Lazy-loaded module references
 let llmManager: any;
 let vectorDB: any;
 let workflowManager: any;
 let gitManager: any;
+let metaLearningProvider: any;
+let emergentBehaviorSystem: any;
 
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('AstraForge IDE activated! Launching into the stratosphere...');
+  logger.info('🚀 AstraForge IDE activated! Launching into the stratosphere...');
 
   // Register providers immediately but lazy-load heavy modules
   await registerProviders(context);
@@ -23,7 +26,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize heavy modules only when needed
   await initializeManagers(context);
 
-  console.log('AstraForge IDE fully activated');
+  logger.info('✅ AstraForge IDE fully activated');
 }
 
 /**
@@ -59,6 +62,27 @@ async function registerProviders(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider('astraforge.projectIgnition', {
       resolveWebviewView: async (webviewView, context, token) => {
         const provider = await getProjectIgnition();
+        return provider.resolveWebviewView(webviewView, context, token);
+      },
+    })
+  );
+
+  // Meta-Learning Dashboard - register immediately for insights access
+  const getMetaLearningProvider = async () => {
+    if (!metaLearningProvider) {
+      const { MetaLearningProvider } = await import('./meta-learning');
+      const { createMetaLearningSystem } = await import('./meta-learning');
+      const metaLearningComponents = createMetaLearningSystem();
+      const integration = new (await import('./meta-learning')).MetaLearningIntegration(metaLearningComponents);
+      metaLearningProvider = new MetaLearningProvider(context.extensionUri, integration);
+    }
+    return metaLearningProvider;
+  };
+
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('astraforge.metaLearning', {
+      resolveWebviewView: async (webviewView, context, token) => {
+        const provider = await getMetaLearningProvider();
         return provider.resolveWebviewView(webviewView, context, token);
       },
     })
@@ -114,19 +138,26 @@ function registerCommands(context: vscode.ExtensionContext) {
       );
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('astraforge.showMetaLearning', async () => {
+      await vscode.commands.executeCommand('workbench.view.extension.astraforge-activitybar');
+      // The MetaLearningProvider will handle the webview display
+    })
+  );
 }
 
 /**
  * Initialize heavy managers only when needed
  */
-async function initializeManagers(context: vscode.ExtensionContext) {
+async function initializeManagers(_context: vscode.ExtensionContext) {
   // Auto-init Git if workspace is open (lightweight)
   if (vscode.workspace.workspaceFolders) {
     await ensureGitManager();
     try {
       await gitManager.initRepo(vscode.workspace.workspaceFolders[0].uri.fsPath);
     } catch (error) {
-      console.error('Git initialization failed:', error);
+      logger.error('Git initialization failed:', error);
     }
   }
 }
@@ -148,7 +179,8 @@ async function ensureLLMManager() {
 async function ensureVectorDB(context: vscode.ExtensionContext) {
   if (!vectorDB) {
     const { VectorDB } = await import('./db/vectorDB');
-    vectorDB = new VectorDB(context.extensionUri.fsPath);
+    const emergentBehavior = await ensureEmergentBehaviorSystem();
+    vectorDB = new VectorDB(context.extensionUri.fsPath, emergentBehavior);
     await vectorDB.init();
   }
   return vectorDB;
@@ -166,14 +198,44 @@ async function ensureGitManager() {
 }
 
 /**
+ * Lazy-load Emergent Behavior System
+ */
+async function ensureEmergentBehaviorSystem() {
+  if (!emergentBehaviorSystem) {
+    const { createEmergentBehaviorSystem } = await import('./emergent-behavior');
+    const { _MetaLearningSystem } = await import('./meta-learning') as any;
+
+    // Initialize meta-learning first if needed
+    let metaLearning: any;
+    try {
+      const { createMetaLearningSystem } = await import('./meta-learning');
+      const metaComponents = createMetaLearningSystem();
+      const { MetaLearningIntegration } = await import('./meta-learning');
+      metaLearning = new MetaLearningIntegration(metaComponents);
+    } catch (error) {
+      logger.warn('Meta-learning system not available for emergent behavior:', error);
+    }
+
+    const behaviorComponents = createEmergentBehaviorSystem(metaLearning);
+    emergentBehaviorSystem = behaviorComponents.emergentBehaviorSystem;
+  }
+  return emergentBehaviorSystem;
+}
+
+/**
  * Lazy-load Workflow Manager (depends on other managers)
  */
 async function ensureWorkflowManager(context: vscode.ExtensionContext) {
   if (!workflowManager) {
-    await Promise.all([ensureLLMManager(), ensureVectorDB(context), ensureGitManager()]);
+    await Promise.all([
+      ensureLLMManager(),
+      ensureVectorDB(context),
+      ensureGitManager(),
+      ensureEmergentBehaviorSystem()
+    ]);
 
     const { WorkflowManager } = await import('./workflow/workflowManager');
-    workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
+    workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager, emergentBehaviorSystem);
   }
   return workflowManager;
 }

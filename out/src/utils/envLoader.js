@@ -3,6 +3,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from './logger';
 export class EnvLoader {
     constructor(projectRoot = process.cwd()) {
         this.projectRoot = projectRoot;
@@ -12,7 +13,7 @@ export class EnvLoader {
     loadEnvFile() {
         const envPath = path.join(this.projectRoot, '.env');
         if (!fs.existsSync(envPath)) {
-            console.warn('No .env file found. Using system environment variables only.');
+            logger.warn('No .env file found. Using system environment variables only.');
             return;
         }
         try {
@@ -32,7 +33,7 @@ export class EnvLoader {
             }
         }
         catch (error) {
-            console.error('Error reading .env file:', error);
+            logger.error('Error reading .env file:', error);
         }
     }
     /**
