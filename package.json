@@ -3,6 +3,7 @@
   "displayName": "AstraForge IDE V2 🚀✨",
   "description": "Revolutionary V2: Complete self-evolving AI ecosystem with quantum algorithms, emergent behavior, recursive self-modification, and inter-agent evolution",
   "version": "2.0.0",
+  "type": "module",
   "publisher": "astraforge",
   "engines": {
     "vscode": "^1.102.0"
