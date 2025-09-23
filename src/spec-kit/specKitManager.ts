@@ -8,6 +8,7 @@ import { SpecGenerator, GeneratedSpec, SpecificationRequest } from './specGenera
 import { PlanGenerator, TechnicalPlan } from './planGenerator';
 import { TaskGenerator, TaskList } from './taskGenerator';
 import { logger } from '../utils/logger';
+import { sanitizeForPath, createSafePath } from '../utils/inputValidation';
 
 export interface SpecKitWorkflow {
   id: string;
@@ -111,7 +112,11 @@ export class SpecKitManager {
     // Create workflow
     const workflowId = this.generateWorkflowId();
     const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-    const specsDir = path.join(workspaceDir, 'specs', `${workflowId}-${spec.title.toLowerCase().replace(/\s+/g, '-')}`);
+    const sanitizedTitle = sanitizeForPath(spec.title);
+    const specsDir = path.join(workspaceDir, 'specs', `${workflowId}-${sanitizedTitle}`);
+    
+    // Validate the specs directory is within expected bounds
+    this.validateWorkflowSpecsDir({ specsDir } as any);
     
     const workflow: SpecKitWorkflow = {
       id: workflowId,
@@ -128,7 +133,7 @@ export class SpecKitManager {
     
     // Create spec directory and save specification
     await this.createDirectoryStructure([specsDir]);
-    const specPath = path.join(specsDir, 'spec.md');
+    const specPath = createSafePath(specsDir, 'spec.md');
     await fs.promises.writeFile(specPath, spec.content, 'utf8');
     
     // Save to vector DB for context
@@ -169,10 +174,10 @@ export class SpecKitManager {
     workflow.updatedAt = new Date();
     
     // Save plan documents
-    const planPath = path.join(workflow.specsDir, 'plan.md');
-    const researchPath = path.join(workflow.specsDir, 'research.md');
-    const dataModelPath = path.join(workflow.specsDir, 'data-model.md');
-    const contractsDir = path.join(workflow.specsDir, 'contracts');
+    const planPath = createSafePath(workflow.specsDir, 'plan.md');
+    const researchPath = createSafePath(workflow.specsDir, 'research.md');
+    const dataModelPath = createSafePath(workflow.specsDir, 'data-model.md');
+    const contractsDir = createSafePath(workflow.specsDir, 'contracts');
     
     await fs.promises.writeFile(planPath, plan.content, 'utf8');
     await fs.promises.writeFile(researchPath, this.formatResearchResults(plan.researchTasks), 'utf8');
@@ -181,7 +186,8 @@ export class SpecKitManager {
     // Create contracts directory and files
     await this.createDirectoryStructure([contractsDir]);
     for (const contract of plan.designPhase.apiContracts) {
-      const contractPath = path.join(contractsDir, `${contract.toLowerCase().replace(/\s+/g, '-')}.json`);
+      const sanitizedContractName = sanitizeForPath(contract);
+      const contractPath = createSafePath(contractsDir, `${sanitizedContractName}.json`);
       await fs.promises.writeFile(contractPath, JSON.stringify({ contract }, null, 2), 'utf8');
     }
     
@@ -232,7 +238,7 @@ export class SpecKitManager {
     workflow.updatedAt = new Date();
     
     // Save tasks
-    const tasksPath = path.join(workflow.specsDir, 'tasks.md');
+    const tasksPath = createSafePath(workflow.specsDir, 'tasks.md');
     await fs.promises.writeFile(tasksPath, taskList.content, 'utf8');
     
     // Save to vector DB
@@ -265,7 +271,7 @@ export class SpecKitManager {
     workflow.updatedAt = new Date();
     
     // Save refined specification
-    const specPath = path.join(workflow.specsDir, 'spec.md');
+    const specPath = createSafePath(workflow.specsDir, 'spec.md');
     await fs.promises.writeFile(specPath, refinedSpec.content, 'utf8');
     
     // Update vector DB
@@ -518,7 +524,7 @@ All code reviews verify constitutional compliance.
         break;
       }
       case 'View Spec': {
-        const specUri = vscode.Uri.file(path.join(workflow.specsDir, 'spec.md'));
+        const specUri = vscode.Uri.file(createSafePath(workflow.specsDir, 'spec.md'));
         await vscode.window.showTextDocument(specUri);
         break;
       }
@@ -547,12 +553,12 @@ All code reviews verify constitutional compliance.
         await this.generateTasks(workflow.id);
         break;
       case 'View Plan': {
-        const planUri = vscode.Uri.file(path.join(workflow.specsDir, 'plan.md'));
+        const planUri = vscode.Uri.file(createSafePath(workflow.specsDir, 'plan.md'));
         await vscode.window.showTextDocument(planUri);
         break;
       }
       case 'Review Research': {
-        const researchUri = vscode.Uri.file(path.join(workflow.specsDir, 'research.md'));
+        const researchUri = vscode.Uri.file(createSafePath(workflow.specsDir, 'research.md'));
         await vscode.window.showTextDocument(researchUri);
         break;
       }
@@ -584,7 +590,7 @@ All code reviews verify constitutional compliance.
         vscode.window.showInformationMessage('🚀 Ready for implementation! Tasks are available in the workflow manager.');
         break;
       case 'View Tasks': {
-        const tasksUri = vscode.Uri.file(path.join(workflow.specsDir, 'tasks.md'));
+        const tasksUri = vscode.Uri.file(createSafePath(workflow.specsDir, 'tasks.md'));
         await vscode.window.showTextDocument(tasksUri);
         break;
       }
@@ -604,6 +610,22 @@ All code reviews verify constitutional compliance.
       await fs.promises.rm(tempDir, { recursive: true, force: true });
     } catch (error) {
       console.error('Error cleaning up temp files:', error);
+    }
+  }
+
+  /**
+   * Validate that workflow.specsDir is within expected bounds to prevent path traversal
+   */
+  private validateWorkflowSpecsDir(workflow: SpecKitWorkflow): void {
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+    const expectedSpecsBaseDir = path.join(workspaceDir, 'specs');
+    
+    const normalizedSpecsDir = path.resolve(workflow.specsDir);
+    const normalizedExpectedBase = path.resolve(expectedSpecsBaseDir);
+    
+    if (!normalizedSpecsDir.startsWith(normalizedExpectedBase + path.sep) && 
+        normalizedSpecsDir !== normalizedExpectedBase) {
+      throw new Error('Invalid workflow specs directory - path traversal detected');
     }
   }
 }
