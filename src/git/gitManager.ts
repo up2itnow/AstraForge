@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { CommitAnalyzer, SeverityAnalysis } from '../utils/commitAnalyzer';
 
 const execAsync = promisify(exec);
 
@@ -132,6 +133,24 @@ export class GitManager {
       } else {
         vscode.window.showErrorMessage(`Git commit failed: ${error.message}`);
       }
+    }
+  }
+
+  /**
+   * Commit with severity analysis for better categorization
+   */
+  async commitWithSeverityAnalysis(message: string): Promise<{
+    committed: boolean;
+    analysis: SeverityAnalysis;
+  }> {
+    const analyzer = new CommitAnalyzer();
+    const analysis = analyzer.analyzeSeverity(message);
+    
+    try {
+      await this.commit(message);
+      return { committed: true, analysis };
+    } catch (error) {
+      return { committed: false, analysis };
     }
   }
 }
