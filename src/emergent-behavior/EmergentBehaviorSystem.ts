@@ -910,44 +910,44 @@ export class EmergentBehaviorSystem {
 
   // Placeholder methods for amplification strategies (would be implemented with actual logic)
 
-  private async generateBehaviorVariations(behavior: EmergentBehavior): Promise<EmergentBehavior[]> {
+  private async generateBehaviorVariations(_behavior: EmergentBehavior): Promise<EmergentBehavior[]> {
     // Generate variations of the behavior for testing
     return [];
   }
 
-  private async testBehaviorVariation(variation: EmergentBehavior): Promise<void> {
+  private async testBehaviorVariation(_variation: EmergentBehavior): Promise<void> {
     // Test the behavior variation
   }
 
-  private async adaptToComplexity(behavior: EmergentBehavior): Promise<EmergentBehavior | null> {
+  private async adaptToComplexity(_behavior: EmergentBehavior): Promise<EmergentBehavior | null> {
     // Adapt the behavior to different complexity levels
     return null;
   }
 
-  private async testAdaptedBehavior(adaptedBehavior: EmergentBehavior): Promise<void> {
+  private async testAdaptedBehavior(_adaptedBehavior: EmergentBehavior): Promise<void> {
     // Test the adapted behavior
   }
 
-  private calculateBehaviorCompatibility(behavior1: EmergentBehavior, behavior2: EmergentBehavior): number {
+  private calculateBehaviorCompatibility(_behavior1: EmergentBehavior, _behavior2: EmergentBehavior): number {
     // Calculate compatibility between two behaviors
     return Math.random() * 0.4 + 0.6; // Placeholder
   }
 
-  private async combineWithBehavior(behavior1: EmergentBehavior, behavior2: EmergentBehavior): Promise<EmergentBehavior> {
+  private async combineWithBehavior(_behavior1: EmergentBehavior, _behavior2: EmergentBehavior): Promise<EmergentBehavior> {
     // Combine two behaviors
-    return behavior1; // Placeholder
+    return _behavior1; // Placeholder
   }
 
-  private async testCombinedBehavior(combined: EmergentBehavior): Promise<void> {
+  private async testCombinedBehavior(_combined: EmergentBehavior): Promise<void> {
     // Test the combined behavior
   }
 
-  private async createSpecializations(behavior: EmergentBehavior): Promise<EmergentBehavior[]> {
+  private async createSpecializations(_behavior: EmergentBehavior): Promise<EmergentBehavior[]> {
     // Create specialized versions of the behavior
     return [];
   }
 
-  private async testSpecialization(specialization: EmergentBehavior): Promise<void> {
+  private async testSpecialization(_specialization: EmergentBehavior): Promise<void> {
     // Test the specialized behavior
   }
 

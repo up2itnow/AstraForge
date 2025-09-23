@@ -218,8 +218,9 @@ export class WorkflowManager {
 
       vscode.window.showInformationMessage('Build Plan ready! Proceeding to phases.');
       await this.executePhase();
-    } catch (error: Error) {
-      vscode.window.showErrorMessage(`Workflow failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Workflow failed: ${errorMessage}`);
     }
   }
 
@@ -249,6 +250,18 @@ export class WorkflowManager {
     const contextText = await this.retrieveContext(phase);
 
     return contextText;
+  }
+
+  private async retrieveContext(phase: string): Promise<string> {
+    const contextQuery = `${phase} for ${this.projectIdea}`;
+    const contextEmbedding = await this.vectorDB.getEmbedding(contextQuery);
+    const relevantContext = await this.vectorDB.queryEmbedding(contextEmbedding, 3);
+
+    return relevantContext
+      .map(item => item.metadata)
+      .filter(meta => meta && typeof meta === 'object')
+      .map(meta => meta.plan || meta.content || '')
+      .join('\n');
   }
 
   private async generatePhaseOutput(phase: string, contextText: string): Promise<string> {
@@ -327,7 +340,7 @@ export class WorkflowManager {
       // Update RL and progress
       await this.updateRLAndProgress(phase, currentState, recommendedAction, userFeedback);
 
-    } catch (error: Error) {
+    } catch (error: unknown) {
       await this.handlePhaseError(error, phase);
     }
   }
@@ -576,12 +589,12 @@ export class WorkflowManager {
     await this.vectorDB.addEmbedding(`phase_${phase}_${Date.now()}`, embedding, contextData);
   }
 
-  private async handlePhaseError(error: Error, phase: string): Promise<void> {
+  private async handlePhaseError(error: unknown, phase: string): Promise<void> {
     this.metrics.errors++;
 
     logger.error(`Phase ${phase} error:`, error);
 
-    const errorMessage = `Phase ${phase} encountered an error: ${error.message}`;
+    const errorMessage = `Phase ${phase} encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`;
     const options = ['Retry phase', 'Skip phase', 'Abort workflow'];
 
     const choice = await vscode.window.showErrorMessage(errorMessage, ...options);
@@ -694,8 +707,9 @@ ${bonuses}
         metrics: this.metrics,
         timestamp: Date.now(),
       });
-    } catch (error: Error) {
-      vscode.window.showErrorMessage(`Project completion failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Project completion failed: ${errorMessage}`);
     }
   }
 

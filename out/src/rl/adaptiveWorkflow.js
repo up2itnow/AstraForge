@@ -2,6 +2,7 @@
  * Reinforcement Learning module for adaptive workflow optimization
  * Uses Q-learning to optimize phase sequencing and decision making
  */
+import { logger } from '../utils/logger';
 export class AdaptiveWorkflowRL {
     constructor() {
         this.qTable = new Map();
@@ -42,7 +43,7 @@ export class AdaptiveWorkflowRL {
                 bestAction = this.deserializeAction(actionKey);
             }
         }
-        console.log(`RL: Selected action ${bestAction.type} for state ${stateKey} (Q-value: ${bestQValue.toFixed(3)})`);
+        logger.info(`RL: Selected action ${bestAction.type} for state ${stateKey} (Q-value: ${bestQValue.toFixed(3)})`);
         return bestAction;
     }
     /**
@@ -82,7 +83,7 @@ export class AdaptiveWorkflowRL {
         entry.visits++;
         // Decay exploration rate
         this.explorationRate = Math.max(this.minExplorationRate, this.explorationRate * this.explorationDecay);
-        console.log(`RL: Updated Q(${stateKey}, ${actionKey}) from ${oldQValue.toFixed(3)} to ${newQValue.toFixed(3)} (reward: ${reward.toFixed(3)})`);
+        logger.info(`RL: Updated Q(${stateKey}, ${actionKey}) from ${oldQValue.toFixed(3)} to ${newQValue.toFixed(3)} (reward: ${reward.toFixed(3)})`);
         // Save updated Q-table periodically
         if (entry.visits % 10 === 0) {
             this.saveQTable();
@@ -220,10 +221,10 @@ export class AdaptiveWorkflowRL {
             }));
             // Store in memory for now - in VS Code extension, this would use vscode.ExtensionContext.globalState
             global.astraforge_qtable = serialized;
-            console.log(`RL: Saved Q-table with ${this.qTable.size} states`);
+            logger.info(`RL: Saved Q-table with ${this.qTable.size} states`);
         }
         catch (error) {
-            console.warn('RL: Failed to save Q-table:', error);
+            logger.warn('RL: Failed to save Q-table:', error);
         }
     }
     loadQTable() {
@@ -244,10 +245,10 @@ export class AdaptiveWorkflowRL {
                 }
                 this.qTable.set(stateData.state, stateActions);
             }
-            console.log(`RL: Loaded Q-table with ${this.qTable.size} states`);
+            logger.info(`RL: Loaded Q-table with ${this.qTable.size} states`);
         }
         catch (error) {
-            console.warn('RL: Failed to load Q-table:', error);
+            logger.warn('RL: Failed to load Q-table:', error);
         }
     }
     /**

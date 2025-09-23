@@ -9,7 +9,7 @@
  * 5. Predict future emergence patterns
  */
 
-import { EmergentBehavior, BehaviorPattern } from '../EmergentBehaviorSystem';
+import { EmergentBehavior, _BehaviorPattern } from '../EmergentBehaviorSystem';
 import { logger } from '../../utils/logger';
 
 export interface BehaviorAnalysis {
@@ -413,18 +413,18 @@ export class BehaviorAnalyzer {
   /**
    * Update impact assessment for the behavior
    */
-  private updateImpactAssessment(_behavior: EmergentBehavior): void {
+  private updateImpactAssessment(__behavior: EmergentBehavior): void {
     const assessment: ImpactAssessment = {
-      behaviorId: _behavior.id,
-      immediateImpact: this.calculateImmediateImpact(_behavior),
-      longTermPotential: this.calculateLongTermPotential(_behavior),
-      riskFactors: this.identifyRiskFactors(_behavior),
-      successFactors: this.identifySuccessFactors(_behavior),
-      scalability: this.assessScalability(_behavior),
-      reproducibility: _behavior.characteristics.reproducibility
+      behaviorId: __behavior.id,
+      immediateImpact: this.calculateImmediateImpact(__behavior),
+      longTermPotential: this.calculateLongTermPotential(__behavior),
+      riskFactors: this.identifyRiskFactors(__behavior),
+      successFactors: this.identifySuccessFactors(__behavior),
+      scalability: this.assessScalability(__behavior),
+      reproducibility: __behavior.characteristics.reproducibility
     };
 
-    this.impactAssessments.set(_behavior.id, assessment);
+    this.impactAssessments.set(__behavior.id, assessment);
   }
 
   // Helper analysis methods
