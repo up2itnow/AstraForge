@@ -8,8 +8,8 @@ node_modules/
 README.md
 CHANGELOG.md
 
-# Build outputs
-out/
+# Build outputs (keep out/ for the compiled extension code)
+# out/  -- commented out because we need the compiled extension code
 dist/
 coverage/
 .nyc_output

@@ -75,17 +75,26 @@ export class WorkflowManager {
   /** Generated project plan */
   private buildPlan: string = '';
 
+  /** LLM Manager for AI provider interactions */
+  private _llmManager: LLMManager;
+
+  /** Vector database for context storage and retrieval */
+  private _vectorDB: VectorDB;
+
+  /** Git manager for version control */
+  private _gitManager: GitManager;
+
   /** Reinforcement learning system for workflow optimization */
-  private workflowRL: AdaptiveWorkflowRL;
+  private _workflowRL: AdaptiveWorkflowRL;
 
   /** Optional collaboration server for multi-user workflows */
-  private collaborationServer?: CollaborationServer;
+  private _collaborationServer?: CollaborationServer;
 
   /** Performance and engagement metrics */
   private metrics: WorkflowMetrics;
 
   /** Unique identifier for this workspace session */
-  private workspaceId: string;
+  private _workspaceId: string;
 
   /** Meta-learning integration for recursive self-improvement */
   private metaLearning?: MetaLearningIntegration;
@@ -102,13 +111,16 @@ export class WorkflowManager {
    * @param emergentBehaviorSystem - System for emergent behavior detection
    */
   constructor(
-    private llmManager: LLMManager,
-    private vectorDB: VectorDB,
-    private gitManager: GitManager,
+    llmManager: LLMManager,
+    vectorDB: VectorDB,
+    gitManager: GitManager,
     emergentBehaviorSystem?: EmergentBehaviorSystem
   ) {
-    this.workflowRL = new AdaptiveWorkflowRL();
-    this.workspaceId = `workspace_${Date.now()}`;
+    this._llmManager = llmManager;
+    this._vectorDB = vectorDB;
+    this._gitManager = gitManager;
+    this._workflowRL = new AdaptiveWorkflowRL();
+    this._workspaceId = `workspace_${Date.now()}`;
     this.emergentBehaviorSystem = emergentBehaviorSystem;
     this.metrics = {
       startTime: Date.now(),
@@ -127,27 +139,27 @@ export class WorkflowManager {
    * Getters for testing purposes - allow access to private dependencies
    */
   get llmManager(): LLMManager {
-    return this.llmManager;
+    return this._llmManager;
   }
 
   get vectorDB(): VectorDB {
-    return this.vectorDB;
+    return this._vectorDB;
   }
 
   get gitManager(): GitManager {
-    return this.gitManager;
+    return this._gitManager;
   }
 
   get workflowRL(): AdaptiveWorkflowRL {
-    return this.workflowRL;
+    return this._workflowRL;
   }
 
   get workspaceId(): string {
-    return this.workspaceId;
+    return this._workspaceId;
   }
 
   get collaborationServer(): CollaborationServer | undefined {
-    return this.collaborationServer;
+    return this._collaborationServer;
   }
 
   /**
@@ -193,7 +205,7 @@ export class WorkflowManager {
       // Enhance project idea with emergent behavior insights from vector context
       let enhancedIdea = idea;
       try {
-        const contextualInsights = await this.vectorDB.getContextualInsights(idea, {
+        const contextualInsights = await this._vectorDB.getContextualInsights(idea, {
           domain: this.extractDomain(idea),
           complexity: this.estimateComplexity(idea),
           requiredInnovation: this.isInnovativeProject(idea),
@@ -240,8 +252,8 @@ export class WorkflowManager {
       }
 
       // Store in vector DB
-      const embedding = await this.vectorDB.getEmbedding(this.buildPlan);
-      await this.vectorDB.addEmbedding('buildPlan', embedding, { plan: this.buildPlan });
+      const embedding = await this._vectorDB.getEmbedding(this.buildPlan);
+      await this._vectorDB.addEmbedding('buildPlan', embedding, { plan: this.buildPlan });
 
       vscode.window.showInformationMessage('Build Plan ready! Proceeding to phases.');
       await this.executePhase();
@@ -253,7 +265,7 @@ export class WorkflowManager {
 
   private async handleRLRecommendation(phase: string): Promise<{ shouldReturn: boolean; currentState: WorkflowState; recommendedAction: WorkflowAction }> {
     const currentState = this.getCurrentWorkflowState();
-    const recommendedAction = this.workflowRL.getBestAction(currentState);
+    const recommendedAction = this._workflowRL.getBestAction(currentState);
 
     if (recommendedAction.type !== 'continue') {
       const actionResult = await this.applyRLAction(recommendedAction, phase);
@@ -281,8 +293,8 @@ export class WorkflowManager {
 
   private async retrieveContext(phase: string): Promise<string> {
     const contextQuery = `${phase} for ${this.projectIdea}`;
-    const contextEmbedding = await this.vectorDB.getEmbedding(contextQuery);
-    const relevantContext = await this.vectorDB.queryEmbedding(contextEmbedding, 3);
+    const contextEmbedding = await this._vectorDB.getEmbedding(contextQuery);
+    const relevantContext = await this._vectorDB.queryEmbedding(contextEmbedding, 3);
 
     return relevantContext
       .map(item => item.metadata)
@@ -299,7 +311,7 @@ export class WorkflowManager {
 
   private async completePhaseOperations(phase: string, processedOutput: string): Promise<void> {
     await this.writePhaseOutput(processedOutput, phase);
-    await this.gitManager.commit(`Phase ${phase} complete - ${this.getPhaseMetrics()}`);
+    await this._gitManager.commit(`Phase ${phase} complete - ${this.getPhaseMetrics()}`);
   }
 
   private async handlePhaseReviewAndSuggestions(phase: string, processedOutput: string, contextText: string): Promise<number> {
@@ -314,7 +326,7 @@ export class WorkflowManager {
 
   private async updateRLAndProgress(phase: string, currentState: WorkflowState, recommendedAction: WorkflowAction, userFeedback: number): Promise<void> {
     const newState = this.getCurrentWorkflowState();
-    const reward = this.workflowRL.calculateReward(
+    const reward = this._workflowRL.calculateReward(
       currentState,
       recommendedAction,
       newState,
@@ -322,7 +334,7 @@ export class WorkflowManager {
       userFeedback
     );
 
-    this.workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
+    this._workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
 
     // Store phase results in vector DB for future context
     await this.storePhaseContext(phase, await this.processPhaseOutput('', phase), {} as any);
@@ -384,8 +396,8 @@ export class WorkflowManager {
     try {
       // Use a random port between 3000-4000 to avoid conflicts in tests
       const port = process.env.NODE_ENV === 'test' ? 0 : 3001;
-      this.collaborationServer = new CollaborationServer(port);
-      await this.collaborationServer.start();
+      this._collaborationServer = new CollaborationServer(port);
+      await this._collaborationServer.start();
       logger.info('Collaboration server initialized');
     } catch (error) {
       logger.warn('Failed to start collaboration server:', error);
@@ -610,10 +622,10 @@ export class WorkflowManager {
       projectIdea: this.projectIdea,
     };
 
-    const embedding = await this.vectorDB.getEmbedding(
+    const embedding = await this._vectorDB.getEmbedding(
       `${phase} ${this.projectIdea} ${output.substring(0, 500)}`
     );
-    await this.vectorDB.addEmbedding(`phase_${phase}_${Date.now()}`, embedding, contextData);
+    await this._vectorDB.addEmbedding(`phase_${phase}_${Date.now()}`, embedding, contextData);
   }
 
   private async handlePhaseError(error: unknown, phase: string): Promise<void> {
@@ -650,7 +662,7 @@ export class WorkflowManager {
     try {
       // Generate comprehensive final report with metrics
       const totalTime = Date.now() - this.metrics.startTime;
-      const rlStats = this.workflowRL.getStats();
+      const rlStats = this._workflowRL.getStats();
 
       const report = await this.llmManager.queryLLM(
         0,
