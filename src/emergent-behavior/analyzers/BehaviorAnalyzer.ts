@@ -9,7 +9,7 @@
  * 5. Predict future emergence patterns
  */
 
-import { EmergentBehavior, _BehaviorPattern } from '../EmergentBehaviorSystem';
+import { EmergentBehavior, BehaviorPattern } from '../EmergentBehaviorSystem';
 import { logger } from '../../utils/logger';
 
 export interface BehaviorAnalysis {

@@ -22,6 +22,12 @@ export class AdaptiveWorkflowRL {
         this.loadQTable();
     }
     /**
+     * Get the optimal action for a given state using epsilon-greedy policy
+     */
+    getOptimalAction(state) {
+        return this.getBestAction(state);
+    }
+    /**
      * Get the best action for a given state using epsilon-greedy policy
      */
     getBestAction(state) {
@@ -88,6 +94,7 @@ export class AdaptiveWorkflowRL {
         if (entry.visits % 10 === 0) {
             this.saveQTable();
         }
+        return newQValue;
     }
     /**
      * Calculate reward based on workflow performance

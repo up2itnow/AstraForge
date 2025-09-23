@@ -33,7 +33,7 @@ describe('Advanced Quantum Testing Suite', () => {
             fc.constant('counting')
           ),
           fc.integer({ min: 10, max: 100 }),
-          async (algorithmType, problemSize) => {
+          async (algorithmType: any, problemSize: any) => {
             const startTime = performance.now();
 
             const result = await quantumLibrary.executeOptimalAlgorithm(
@@ -74,7 +74,7 @@ describe('Advanced Quantum Testing Suite', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 10, max: 50 }),
-          async (baseSize) => {
+          async (baseSize: any) => {
             const sizes = [baseSize, baseSize * 2, baseSize * 4];
             const results: any[] = [];
 
@@ -130,7 +130,7 @@ describe('Advanced Quantum Testing Suite', () => {
             problemComplexity: fc.double({ min: 0.1, max: 1.0 }),
             timeConstraint: fc.integer({ min: 100, max: 5000 })
           }),
-          async (problemSpec) => {
+          async (problemSpec: any) => {
             const algorithms = quantumLibrary.getAllAlgorithms();
             const performanceResults: any[] = [];
 
@@ -191,7 +191,7 @@ describe('Advanced Quantum Testing Suite', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 5, max: 20 }),
-          async (numRuns) => {
+          async (numRuns: any) => {
             const baselineTimes: number[] = [];
             const results: any[] = [];
 
@@ -250,7 +250,7 @@ describe('Advanced Quantum Testing Suite', () => {
             fc.constant('simulation')
           ),
           fc.integer({ min: 10, max: 100 }),
-          async (problemType, problemSize) => {
+          async (problemType: any, problemSize: any) => {
             const startTime = performance.now();
 
             const quantumResult = await quantumLibrary.executeOptimalAlgorithm(
@@ -288,7 +288,7 @@ describe('Advanced Quantum Testing Suite', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 20, max: 100 }),
-          async (problemSize) => {
+          async (problemSize: any) => {
             const results = await Promise.all([
               quantumLibrary.executeOptimalAlgorithm({ size: problemSize }, 'optimization'),
               quantumLibrary.executeOptimalAlgorithm({ size: problemSize }, 'search'),
@@ -317,7 +317,7 @@ describe('Advanced Quantum Testing Suite', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 10, max: 50 }),
-          async (baseSize) => {
+          async (baseSize: any) => {
             const scales = [baseSize, baseSize * 2, baseSize * 4, baseSize * 8];
             const scaleResults: any[] = [];
 
@@ -357,7 +357,7 @@ describe('Advanced Quantum Testing Suite', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 1, max: 10 }),
-          async (smallSize) => {
+          async (smallSize: any) => {
             const result = await quantumLibrary.executeOptimalAlgorithm(
               { size: smallSize },
               'optimization'
@@ -386,7 +386,7 @@ describe('Advanced Quantum Testing Suite', () => {
         fc.asyncProperty(
           fc.double({ min: 0, max: 0.3 }),
           fc.double({ min: 0, max: 0.3 }),
-          async (errorRate, decoherenceRate) => {
+          async (errorRate: any, decoherenceRate: any) => {
             const result = await quantumLibrary.executeOptimalAlgorithm(
               { size: 50, errorRate, decoherenceRate },
               'optimization'
@@ -411,7 +411,7 @@ describe('Advanced Quantum Testing Suite', () => {
         fc.asyncProperty(
           fc.array(fc.double({ min: -1, max: 1 }), { minLength: 4, maxLength: 8 }),
           fc.double({ min: 0, max: 0.5 }),
-          async (initialAmplitudes, noiseLevel) => {
+          async (initialAmplitudes: any, noiseLevel: any) => {
             const noisyState = addNoiseToState(initialAmplitudes, noiseLevel);
             const correctedState = applyErrorCorrection(noisyState);
 
@@ -437,7 +437,7 @@ describe('Advanced Quantum Testing Suite', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 1, max: 10 }),
-          async (errorCount) => {
+          async (errorCount: any) => {
             const errorScenarios = generateErrorScenarios(errorCount);
             const recoveryResults: any[] = [];
 
@@ -484,7 +484,7 @@ describe('Advanced Quantum Testing Suite', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 5, max: 20 }),
-          async (stressLevel) => {
+          async (stressLevel: any) => {
             const stressScenarios = generateStressScenarios(stressLevel);
 
             for (const scenario of stressScenarios) {
@@ -514,7 +514,7 @@ describe('Advanced Quantum Testing Suite', () => {
         fc.asyncProperty(
           fc.array(fc.double({ min: -1, max: 1 }), { minLength: 2, maxLength: 8 }),
           fc.integer({ min: 1, max: 10 }),
-          async (initialAmplitudes, numOperations) => {
+          async (initialAmplitudes: any, numOperations: any) => {
             let currentState = {
               amplitudes: initialAmplitudes,
               coherence: 0.8,
@@ -527,7 +527,7 @@ describe('Advanced Quantum Testing Suite', () => {
             // Apply multiple quantum operations
             for (let i = 0; i < numOperations; i++) {
               const phaseShift = (Math.PI * i) / numOperations;
-              currentState = applyQuantumOperation(currentState, phaseShift);
+              currentState = applyQuantumTransition(currentState, phaseShift);
               stateHistory.push(currentState);
 
               // Verify state remains physically valid
@@ -558,13 +558,13 @@ describe('Advanced Quantum Testing Suite', () => {
         fc.asyncProperty(
           fc.array(fc.double({ min: -1, max: 1 }), { minLength: 2, maxLength: 4 }),
           fc.double({ min: 0, max: 2 * Math.PI }),
-          async (amplitudes, evolutionAngle) => {
+          async (amplitudes: any, evolutionAngle: any) => {
             const initialState = createQuantumState(amplitudes);
             const evolvedState = evolveQuantumState(initialState, evolutionAngle);
 
             // Should preserve normalization
-            const initialNorm = Math.sqrt(amplitudes.reduce((sum, amp) => sum + amp * amp, 0));
-            const evolvedNorm = Math.sqrt(evolvedState.amplitudes.reduce((sum, amp) => sum + amp * amp, 0));
+            const initialNorm = Math.sqrt(amplitudes.reduce((sum: number, amp: number) => sum + amp * amp, 0));
+            const evolvedNorm = Math.sqrt(evolvedState.amplitudes.reduce((sum: number, amp: number) => sum + amp * amp, 0));
 
             expect(Math.abs(evolvedNorm - initialNorm)).toBeLessThan(0.01);
 
@@ -588,7 +588,7 @@ describe('Advanced Quantum Testing Suite', () => {
             entanglement: fc.double({ min: -1, max: 2 }),
             superposition: fc.integer({ min: -5, max: 50 })
           }),
-          async (invalidState) => {
+          async (invalidState: any) => {
             const consistencyCheck = verifyQuantumStateConsistency(invalidState);
 
             // Should detect inconsistencies
@@ -612,7 +612,7 @@ describe('Advanced Quantum Testing Suite', () => {
         fc.asyncProperty(
           fc.array(fc.double({ min: -1, max: 1 }), { minLength: 2, maxLength: 4 }),
           fc.double({ min: 0, max: 2 * Math.PI }),
-          async (amplitudes, evolutionAngle) => {
+          async (amplitudes: any, evolutionAngle: any) => {
             const initialState = createQuantumState(amplitudes);
 
             // Multiple evolutions should be deterministic
@@ -641,7 +641,7 @@ describe('Advanced Quantum Testing Suite', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 2, max: 10 }),
-          async (numTransitions) => {
+          async (numTransitions: any) => {
             const transitionStates: any[] = [];
             let currentState = createInitialQuantumState();
 
@@ -832,7 +832,7 @@ describe('Advanced Quantum Testing Suite', () => {
           case 'rotation':
             return amp * Math.cos(transition.angle);
           case 'phase-shift':
-            return amp * Math.exp(1j * transition.angle);
+            return amp * Math.exp(1 * Math.PI * transition.angle);
           case 'entanglement-gate':
             return amp * (1 - transition.angle / (2 * Math.PI));
           default:

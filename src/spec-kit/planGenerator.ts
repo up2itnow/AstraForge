@@ -190,17 +190,17 @@ export class PlanGenerator {
     };
   }
 
-  private async determineTechnicalContext(spec: GeneratedSpec, requirements?: Partial<TechnicalContext>): Promise<TechnicalContext> {
-    const prompt = `
+  private buildTechnicalContextPrompt(spec: GeneratedSpec, requirements?: Partial<TechnicalContext>): string {
+    return `
     Determine the technical context for this feature specification:
-    
+
     Feature: ${spec.title}
     Requirements: ${JSON.stringify(spec.functionalRequirements, null, 2)}
     User Scenarios: ${JSON.stringify(spec.userScenarios, null, 2)}
     Key Entities: ${JSON.stringify(spec.keyEntities, null, 2)}
-    
+
     ${requirements ? `Existing Requirements: ${JSON.stringify(requirements, null, 2)}` : ''}
-    
+
     Determine:
     1. Best programming language and version
     2. Primary dependencies/frameworks
@@ -211,41 +211,52 @@ export class PlanGenerator {
     7. Performance goals
     8. Constraints
     9. Scale/scope
-    
+
     Consider AstraForge context: This is a VS Code extension environment with Node.js/TypeScript.
-    
+
     Return JSON with technical context structure.
     `;
+  }
+
+  private parseTechnicalContextResponse(response: string, requirements?: Partial<TechnicalContext>): TechnicalContext {
+    const context = JSON.parse(response);
+
+    return {
+      language: requirements?.language || context.language || 'TypeScript 5.1',
+      primaryDependencies: requirements?.primaryDependencies || context.primaryDependencies || ['Node.js'],
+      storage: requirements?.storage || context.storage || 'File System',
+      testing: requirements?.testing || context.testing || 'Jest',
+      targetPlatform: requirements?.targetPlatform || context.targetPlatform || 'VS Code Extension',
+      projectType: requirements?.projectType || context.projectType || 'single',
+      performanceGoals: requirements?.performanceGoals || context.performanceGoals || ['Responsive UI'],
+      constraints: requirements?.constraints || context.constraints || ['VS Code API limitations'],
+      scale: requirements?.scale || context.scale || 'Single user workspace'
+    };
+  }
+
+  private getDefaultTechnicalContext(): TechnicalContext {
+    return {
+      language: 'TypeScript 5.1',
+      primaryDependencies: ['Node.js', 'VS Code API'],
+      storage: 'File System',
+      testing: 'Jest',
+      targetPlatform: 'VS Code Extension',
+      projectType: 'single',
+      performanceGoals: ['Responsive UI', '<100ms response time'],
+      constraints: ['VS Code API limitations', 'Single workspace context'],
+      scale: 'Single user workspace'
+    };
+  }
+
+  private async determineTechnicalContext(spec: GeneratedSpec, requirements?: Partial<TechnicalContext>): Promise<TechnicalContext> {
+    const prompt = this.buildTechnicalContextPrompt(spec, requirements);
 
     try {
       const response = await this.llmManager.generateResponse('openai', prompt);
-      const context = JSON.parse(response);
-      
-      // Merge with provided requirements
-      return {
-        language: requirements?.language || context.language || 'TypeScript 5.1',
-        primaryDependencies: requirements?.primaryDependencies || context.primaryDependencies || ['Node.js'],
-        storage: requirements?.storage || context.storage || 'File System',
-        testing: requirements?.testing || context.testing || 'Jest',
-        targetPlatform: requirements?.targetPlatform || context.targetPlatform || 'VS Code Extension',
-        projectType: requirements?.projectType || context.projectType || 'single',
-        performanceGoals: requirements?.performanceGoals || context.performanceGoals || ['Responsive UI'],
-        constraints: requirements?.constraints || context.constraints || ['VS Code API limitations'],
-        scale: requirements?.scale || context.scale || 'Single user workspace'
-      };
+      return this.parseTechnicalContextResponse(response, requirements);
     } catch (error) {
       logger.error('Error determining technical context:', error);
-      return {
-        language: 'TypeScript 5.1',
-        primaryDependencies: ['Node.js', 'VS Code API'],
-        storage: 'File System',
-        testing: 'Jest',
-        targetPlatform: 'VS Code Extension',
-        projectType: 'single',
-        performanceGoals: ['Responsive UI', '<100ms response time'],
-        constraints: ['VS Code API limitations', 'Single workspace context'],
-        scale: 'Single user workspace'
-      };
+      return this.getDefaultTechnicalContext();
     }
   }
 
@@ -289,83 +300,91 @@ export class PlanGenerator {
     }
   }
 
-  private async performConstitutionCheck(spec: GeneratedSpec, context: TechnicalContext): Promise<ConstitutionCheck> {
-    const prompt = `
+  private buildConstitutionCheckPrompt(spec: GeneratedSpec, context: TechnicalContext): string {
+    return `
     Perform constitution compliance check for this plan:
-    
+
     Specification: ${spec.title}
     Technical Context: ${JSON.stringify(context, null, 2)}
     Functional Requirements: ${JSON.stringify(spec.functionalRequirements, null, 2)}
-    
+
     Check against AstraForge Constitution:
-    
+
     1. Simplicity:
        - Max 3 projects
        - Using framework directly (no wrapper classes)
        - Single data model (no DTOs unless needed)
        - Avoiding unnecessary patterns
-    
+
     2. Architecture:
        - Every feature as library
        - CLI per library
        - Library documentation planned
-    
+
     3. Testing (NON-NEGOTIABLE):
        - RED-GREEN-Refactor cycle
        - Tests before implementation
        - Contract→Integration→E2E→Unit order
        - Real dependencies used
        - Integration tests for new libraries
-    
+
     4. Observability:
        - Structured logging
        - Error context
-    
+
     5. Versioning:
        - Version number assigned
        - BUILD increments
        - Breaking changes handled
-    
+
     Return detailed constitution check object with violations.
     `;
+  }
+
+  private getDefaultConstitutionCheck(spec: GeneratedSpec): ConstitutionCheck {
+    return {
+      simplicity: {
+        projectCount: 1,
+        usingFrameworkDirectly: true,
+        singleDataModel: true,
+        avoidingPatterns: true
+      },
+      architecture: {
+        everyFeatureAsLibrary: true,
+        libraries: [{ name: spec.title, purpose: 'Core functionality' }],
+        cliPerLibrary: [`${spec.title.toLowerCase()}`],
+        libraryDocsPlanned: true
+      },
+      testing: {
+        redGreenRefactorEnforced: true,
+        gitCommitsShowTestsFirst: true,
+        orderFollowed: true,
+        realDependenciesUsed: true,
+        integrationTestsPlanned: true
+      },
+      observability: {
+        structuredLoggingIncluded: true,
+        frontendToBackendLogs: false,
+        errorContextSufficient: true
+      },
+      versioning: {
+        versionAssigned: '1.0.0',
+        buildIncrementsPlanned: true,
+        breakingChangesHandled: true
+      },
+      violations: []
+    };
+  }
+
+  private async performConstitutionCheck(spec: GeneratedSpec, context: TechnicalContext): Promise<ConstitutionCheck> {
+    const prompt = this.buildConstitutionCheckPrompt(spec, context);
 
     try {
       const response = await this.llmManager.generateResponse('openai', prompt);
       return JSON.parse(response);
     } catch (error) {
       logger.error('Error performing constitution check:', error);
-      return {
-        simplicity: {
-          projectCount: 1,
-          usingFrameworkDirectly: true,
-          singleDataModel: true,
-          avoidingPatterns: true
-        },
-        architecture: {
-          everyFeatureAsLibrary: true,
-          libraries: [{ name: spec.title, purpose: 'Core functionality' }],
-          cliPerLibrary: [`${spec.title.toLowerCase()}`],
-          libraryDocsPlanned: true
-        },
-        testing: {
-          redGreenRefactorEnforced: true,
-          gitCommitsShowTestsFirst: true,
-          orderFollowed: true,
-          realDependenciesUsed: true,
-          integrationTestsPlanned: true
-        },
-        observability: {
-          structuredLoggingIncluded: true,
-          frontendToBackendLogs: false,
-          errorContextSufficient: true
-        },
-        versioning: {
-          versionAssigned: '1.0.0',
-          buildIncrementsPlanned: true,
-          breakingChangesHandled: true
-        },
-        violations: []
-      };
+      return this.getDefaultConstitutionCheck(spec);
     }
   }
 
@@ -514,53 +533,65 @@ Estimated Output: 15-25 numbered, ordered tasks following constitutional princip
     }
   }
 
-  private assemblePlan(data: any): string {
-    const currentDate = new Date().toISOString().split('T')[0];
-    
-    let plan = this.planTemplate;
-    
-    // Replace template variables
-    plan = plan.replace(/\{\{FEATURE_NAME\}\}/g, data.spec.title);
-    plan = plan.replace(/\{\{BRANCH_NAME\}\}/g, `001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}`);
-    plan = plan.replace(/\{\{DATE\}\}/g, currentDate);
-    plan = plan.replace(/\{\{SPEC_LINK\}\}/g, `specs/001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}/spec.md`);
-    plan = plan.replace(/\{\{FEATURE_DIR\}\}/g, `001-${data.spec.title.toLowerCase().replace(/\s+/g, '-')}`);
-    
-    // Replace content sections
-    plan = plan.replace('{{SUMMARY}}', data.summary);
-    plan = plan.replace('{{LANGUAGE}}', data.technicalContext.language);
-    plan = plan.replace('{{DEPENDENCIES}}', data.technicalContext.primaryDependencies.join(', '));
-    plan = plan.replace('{{STORAGE}}', data.technicalContext.storage);
-    plan = plan.replace('{{TESTING}}', data.technicalContext.testing);
-    plan = plan.replace('{{TARGET_PLATFORM}}', data.technicalContext.targetPlatform);
-    plan = plan.replace('{{PROJECT_TYPE}}', data.technicalContext.projectType);
-    plan = plan.replace('{{PERFORMANCE_GOALS}}', data.technicalContext.performanceGoals.join(', '));
-    plan = plan.replace('{{CONSTRAINTS}}', data.technicalContext.constraints.join(', '));
-    plan = plan.replace('{{SCALE}}', data.technicalContext.scale);
-    
-    // Constitution check
-    const constitutionSection = this.formatConstitutionCheck(data.constitutionCheck);
-    plan = plan.replace('{{CONSTITUTION_CHECK}}', constitutionSection);
-    
-    // Project structure
-    const structureSection = this.formatProjectStructure(data.projectStructure);
-    plan = plan.replace('{{PROJECT_STRUCTURE}}', structureSection);
-    
-    // Research phase
-    const researchSection = this.formatResearchPhase(data.researchTasks);
-    plan = plan.replace('{{RESEARCH_PHASE}}', researchSection);
-    
-    // Design phase
-    const designSection = this.formatDesignPhase(data.designPhase);
-    plan = plan.replace('{{DESIGN_PHASE}}', designSection);
-    
-    // Task planning
-    plan = plan.replace('{{TASK_PLANNING}}', data.taskPlanningApproach);
-    
-    // Progress tracking
+  private replacePlanTemplateVariables(plan: string, data: Record<string, unknown>): string {
+    let result = plan;
+
+    result = result.replace(/\{\{FEATURE_NAME\}\}/g, String((data.spec as any)?.title || ''));
+    result = result.replace(/\{\{BRANCH_NAME\}\}/g, `001-${String((data.spec as any)?.title || '').toLowerCase().replace(/\s+/g, '-')}`);
+    result = result.replace(/\{\{DATE\}\}/g, new Date().toISOString().split('T')[0]);
+    result = result.replace(/\{\{SPEC_LINK\}\}/g, `specs/001-${String((data.spec as any)?.title || '').toLowerCase().replace(/\s+/g, '-')}/spec.md`);
+    result = result.replace(/\{\{FEATURE_DIR\}\}/g, `001-${String((data.spec as any)?.title || '').toLowerCase().replace(/\s+/g, '-')}`);
+
+    return result;
+  }
+
+  private replacePlanContentSections(plan: string, data: Record<string, unknown>): string {
+    let result = plan;
+
+    result = result.replace('{{SUMMARY}}', String(data.summary || ''));
+    result = result.replace('{{LANGUAGE}}', String((data.technicalContext as any)?.language || ''));
+    result = result.replace('{{DEPENDENCIES}}', String((data.technicalContext as any)?.primaryDependencies?.join(', ') || ''));
+    result = result.replace('{{STORAGE}}', String((data.technicalContext as any)?.storage || ''));
+    result = result.replace('{{TESTING}}', String((data.technicalContext as any)?.testing || ''));
+    result = result.replace('{{TARGET_PLATFORM}}', String((data.technicalContext as any)?.targetPlatform || ''));
+    result = result.replace('{{PROJECT_TYPE}}', String((data.technicalContext as any)?.projectType || ''));
+    result = result.replace('{{PERFORMANCE_GOALS}}', String((data.technicalContext as any)?.performanceGoals?.join(', ') || ''));
+    result = result.replace('{{CONSTRAINTS}}', String((data.technicalContext as any)?.constraints?.join(', ') || ''));
+    result = result.replace('{{SCALE}}', String((data.technicalContext as any)?.scale || ''));
+
+    return result;
+  }
+
+  private replacePlanSections(plan: string, data: Record<string, unknown>): string {
+    let result = plan;
+
+    const constitutionSection = this.formatConstitutionCheck(data.constitutionCheck as any);
+    result = result.replace('{{CONSTITUTION_CHECK}}', constitutionSection);
+
+    const structureSection = this.formatProjectStructure(data.projectStructure as any);
+    result = result.replace('{{PROJECT_STRUCTURE}}', structureSection);
+
+    const researchSection = this.formatResearchPhase(data.researchTasks as any);
+    result = result.replace('{{RESEARCH_PHASE}}', researchSection);
+
+    const designSection = this.formatDesignPhase(data.designPhase as any);
+    result = result.replace('{{DESIGN_PHASE}}', designSection);
+
+    result = result.replace('{{TASK_PLANNING}}', String(data.taskPlanningApproach || ''));
+
     const progressSection = this.formatProgressTracking();
-    plan = plan.replace('{{PROGRESS_TRACKING}}', progressSection);
-    
+    result = result.replace('{{PROGRESS_TRACKING}}', progressSection);
+
+    return result;
+  }
+
+  private assemblePlan(data: any): string {
+    let plan = this.planTemplate;
+
+    plan = this.replacePlanTemplateVariables(plan, data);
+    plan = this.replacePlanContentSections(plan, data);
+    plan = this.replacePlanSections(plan, data);
+
     return plan;
   }
 

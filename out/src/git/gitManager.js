@@ -74,6 +74,18 @@ export class GitManager {
             return `Git status failed: ${error.message}`;
         }
     }
+    async getDiff() {
+        if (!this.workspacePath) {
+            return 'Git workspace not initialized';
+        }
+        try {
+            const { stdout } = await execAsync('git diff', { cwd: this.workspacePath });
+            return stdout;
+        }
+        catch (error) {
+            return `Git diff failed: ${error.message}`;
+        }
+    }
     async addAndCommit(files, message) {
         if (!this.workspacePath) {
             vscode.window.showWarningMessage('Git workspace not initialized');

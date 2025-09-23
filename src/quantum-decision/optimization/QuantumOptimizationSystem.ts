@@ -53,6 +53,17 @@ export interface OptimizationResult {
     classicalOperations: number;
     convergenceRate: number;
   };
+  paretoFront?: Array<{ solution: number[]; objectives: number[] }>;
+  hypervolume?: number;
+  tunnelingEvents?: number;
+  temperature?: number;
+  tabuList?: string[];
+  intensification?: number;
+  diversification?: number;
+  mutationRate?: number;
+  crossoverRate?: number;
+  quantumMutation?: number;
+  successRate?: number;
 }
 
 export class QuantumOptimizationSystem {
@@ -61,6 +72,32 @@ export class QuantumOptimizationSystem {
 
   constructor() {
     this.initializeQuantumAlgorithms();
+  }
+
+  /**
+   * Optimize problem using quantum-enhanced algorithms (alias for solveOptimizationProblem)
+   */
+  async optimize(
+    algorithmType: string,
+    problem: OptimizationProblem,
+    options: {
+      maxIterations?: number;
+      populationSize?: number;
+      quantumBoost?: number;
+      parallel?: boolean;
+    } = {}
+  ): Promise<OptimizationResult> {
+    const typeMap: Record<string, 'genetic' | 'swarm' | 'annealing' | 'tabu' | 'evolution' | 'multi-objective'> = {
+      'genetic_quantum': 'genetic',
+      'swarm_quantum': 'swarm',
+      'annealing_quantum': 'annealing',
+      'tabu_quantum': 'tabu',
+      'evolution_quantum': 'evolution',
+      'multi-objective_quantum': 'multi-objective'
+    };
+
+    const mappedType = typeMap[algorithmType] || 'genetic';
+    return this.solveOptimizationProblem(problem, mappedType, options);
   }
 
   /**

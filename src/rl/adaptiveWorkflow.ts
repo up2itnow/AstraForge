@@ -5,7 +5,7 @@
 
 import { logger } from '../utils/logger';
 
-interface WorkflowState {
+export interface WorkflowState {
   currentPhase: string;
   projectComplexity: number; // 0-1 scale
   userSatisfaction: number; // 0-1 scale from feedback
@@ -13,7 +13,7 @@ interface WorkflowState {
   timeSpent: number; // normalized time
 }
 
-interface WorkflowAction {
+export interface WorkflowAction {
   type: 'continue' | 'skip' | 'repeat' | 'branch' | 'optimize';
   target?: string; // target phase or optimization
   confidence: number; // 0-1 scale
@@ -45,6 +45,13 @@ export class AdaptiveWorkflowRL {
 
   constructor() {
     this.loadQTable();
+  }
+
+  /**
+   * Get the optimal action for a given state using epsilon-greedy policy
+   */
+  getOptimalAction(state: WorkflowState): WorkflowAction {
+    return this.getBestAction(state);
   }
 
   /**
@@ -88,7 +95,7 @@ export class AdaptiveWorkflowRL {
     action: WorkflowAction,
     reward: number,
     nextState: WorkflowState
-  ): void {
+  ): number {
     const stateKey = this.serializeState(state);
     const actionKey = this.serializeAction(action);
     const nextStateKey = this.serializeState(nextState);
@@ -143,6 +150,8 @@ export class AdaptiveWorkflowRL {
     if (entry.visits % 10 === 0) {
       this.saveQTable();
     }
+
+    return newQValue;
   }
 
   /**

@@ -88,14 +88,23 @@ describe('AstraForge Core Workflow Integration', () => {
   describe('Project Analysis Integration', () => {
     beforeEach(() => {
       // Setup mock responses
-      mockVector.getContextualInsights.mockResolvedValue([
-        {
-          id: 'context-1',
-          content: 'Previous project used React with TypeScript',
-          similarity: 0.8,
-          metadata: { domain: 'web', complexity: 0.7 }
+      mockVector.getContextualInsights.mockResolvedValue({
+        documents: [
+          {
+            id: 'context-1',
+            content: 'Previous project used React with TypeScript',
+            similarity: 0.8,
+            metadata: { domain: 'web', complexity: 0.7 }
+          }
+        ],
+        insights: {
+          dominantBehaviorType: 'collaborative',
+          averageInnovationIndex: 0.7,
+          complexityDistribution: { 'web': 0.6, 'backend': 0.4 },
+          recommendedPatterns: ['MVC', 'REST'],
+          emergentOpportunities: ['microservices', 'containerization']
         }
-      ]);
+      });
 
       mockLLM.conference.mockResolvedValue(
         'Based on the context, I recommend using React with TypeScript for this web application. ' +
@@ -132,7 +141,16 @@ describe('AstraForge Core Workflow Integration', () => {
       jest.spyOn(workflowManager as any, 'extractDomain').mockReturnValue('web');
       jest.spyOn(workflowManager as any, 'identifyBehaviorPatterns').mockReturnValue([]);
 
-      mockVector.getContextualInsights.mockResolvedValue([]);
+      mockVector.getContextualInsights.mockResolvedValue({
+        documents: [],
+        insights: {
+          dominantBehaviorType: 'unknown',
+          averageInnovationIndex: 0.5,
+          complexityDistribution: {},
+          recommendedPatterns: [],
+          emergentOpportunities: []
+        }
+      });
       mockLLM.conference.mockResolvedValue('Simple web app plan');
 
       await workflowManager.startWorkflow(projectIdea);
@@ -157,14 +175,23 @@ describe('AstraForge Core Workflow Integration', () => {
     });
 
     it('should execute planning phase with context retrieval', async () => {
-      const mockContext = [
-        {
-          id: 'context-1',
-          content: 'Previous planning phase succeeded',
-          similarity: 0.9,
-          metadata: { phase: 'planning', success: true }
+      const mockContext = {
+        documents: [
+          {
+            id: 'context-1',
+            content: 'Previous planning phase succeeded',
+            similarity: 0.9,
+            metadata: { phase: 'planning', success: true }
+          }
+        ],
+        insights: {
+          dominantBehaviorType: 'planning',
+          averageInnovationIndex: 0.8,
+          complexityDistribution: { 'planning': 0.7 },
+          recommendedPatterns: ['agile', 'iterative'],
+          emergentOpportunities: ['automated-planning']
         }
-      ];
+      };
 
       mockVector.getContextualInsights.mockResolvedValue(mockContext);
       mockLLM.conference.mockResolvedValue('Planning phase completed successfully');
@@ -285,7 +312,7 @@ describe('AstraForge Core Workflow Integration', () => {
   describe('Configuration Integration', () => {
     it('should work with different LLM configurations', () => {
       // Test with different provider configurations
-      mockLLM.panel = [
+      (mockLLM as any).panel = [
         { provider: 'Anthropic', key: 'test-key', model: 'claude-3', role: 'primary' }
       ];
 

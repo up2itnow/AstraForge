@@ -50,11 +50,11 @@ describe('AdaptiveWorkflowRL', () => {
     it('should define workflow actions', () => {
       const actions = (rlSystem as any).actions;
       expect(actions).toHaveLength(5);
-      expect(actions.some(a => a.type === 'continue')).toBe(true);
-      expect(actions.some(a => a.type === 'skip')).toBe(true);
-      expect(actions.some(a => a.type === 'repeat')).toBe(true);
-      expect(actions.some(a => a.type === 'branch')).toBe(true);
-      expect(actions.some(a => a.type === 'optimize')).toBe(true);
+      expect(actions.some((a: WorkflowAction) => a.type === 'continue')).toBe(true);
+      expect(actions.some((a: WorkflowAction) => a.type === 'skip')).toBe(true);
+      expect(actions.some((a: WorkflowAction) => a.type === 'repeat')).toBe(true);
+      expect(actions.some((a: WorkflowAction) => a.type === 'branch')).toBe(true);
+      expect(actions.some((a: WorkflowAction) => a.type === 'optimize')).toBe(true);
     });
   });
 

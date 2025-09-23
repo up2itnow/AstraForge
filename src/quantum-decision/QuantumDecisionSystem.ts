@@ -123,9 +123,9 @@ export class QuantumDecisionSystem {
   async makeDecision(
     type: QuantumDecision['type'],
     context: any,
-    constraints: DecisionConstraint[],
-    objectives: DecisionObjective[],
-    alternatives: DecisionAlternative[]
+    constraints: DecisionConstraint[] = [],
+    objectives: DecisionObjective[] = [],
+    alternatives: DecisionAlternative[] = []
   ): Promise<QuantumDecisionResult> {
     const decisionId = `quantum_${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 

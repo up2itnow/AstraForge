@@ -19,7 +19,7 @@ describe('GitManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     gitManager = new GitManager();
-    mockWindow = jest.spyOn(vscode.window, 'showInformationMessage').mockImplementation(() => Promise.resolve());
+    mockWindow = jest.spyOn(vscode.window, 'showInformationMessage').mockImplementation(() => Promise.resolve(undefined));
   });
 
   afterEach(() => {
@@ -47,7 +47,7 @@ describe('GitManager', () => {
     });
 
     it('should handle commit operations', async () => {
-      const mockShowWarning = jest.spyOn(vscode.window, 'showWarningMessage').mockImplementation(() => Promise.resolve());
+      const mockShowWarning = jest.spyOn(vscode.window, 'showWarningMessage').mockImplementation(() => Promise.resolve(undefined));
       const commitMessage = 'Test commit message';
 
       await gitManager.commit(commitMessage);
@@ -56,7 +56,7 @@ describe('GitManager', () => {
     });
 
     it('should show warning when workspace not initialized', async () => {
-      const mockShowWarning = jest.spyOn(vscode.window, 'showWarningMessage').mockImplementation(() => Promise.resolve());
+      const mockShowWarning = jest.spyOn(vscode.window, 'showWarningMessage').mockImplementation(() => Promise.resolve(undefined));
       const gitManagerNoPath = new GitManager();
       const commitMessage = 'Test commit';
 
@@ -66,7 +66,7 @@ describe('GitManager', () => {
     });
 
     it('should handle getStatus operations', async () => {
-      const mockShowWarning = jest.spyOn(vscode.window, 'showWarningMessage').mockImplementation(() => Promise.resolve());
+      const mockShowWarning = jest.spyOn(vscode.window, 'showWarningMessage').mockImplementation(() => Promise.resolve(undefined));
 
       await gitManager.getStatus();
 
@@ -74,7 +74,7 @@ describe('GitManager', () => {
     });
 
     it('should handle getDiff operations', async () => {
-      const mockShowWarning = jest.spyOn(vscode.window, 'showWarningMessage').mockImplementation(() => Promise.resolve());
+      const mockShowWarning = jest.spyOn(vscode.window, 'showWarningMessage').mockImplementation(() => Promise.resolve(undefined));
 
       await gitManager.getDiff();
 
@@ -84,7 +84,7 @@ describe('GitManager', () => {
 
   describe('error handling', () => {
     it('should handle initialization errors gracefully', async () => {
-      const mockShowError = jest.spyOn(vscode.window, 'showErrorMessage').mockImplementation(() => Promise.resolve());
+      const mockShowError = jest.spyOn(vscode.window, 'showErrorMessage').mockImplementation(() => Promise.resolve(undefined));
       const testPath = '/test/workspace';
 
       // Mock execAsync to throw an error for init
@@ -96,7 +96,7 @@ describe('GitManager', () => {
     });
 
     it('should handle commit errors gracefully', async () => {
-      const mockShowError = jest.spyOn(vscode.window, 'showErrorMessage').mockImplementation(() => Promise.resolve());
+      const mockShowError = jest.spyOn(vscode.window, 'showErrorMessage').mockImplementation(() => Promise.resolve(undefined));
       (gitManager as any).workspacePath = '/test/workspace';
 
       // Mock execAsync to throw an error for commit
@@ -111,7 +111,7 @@ describe('GitManager', () => {
 
   describe('integration with VSCode', () => {
     it('should show information messages for successful operations', async () => {
-      const mockShowInfo = jest.spyOn(vscode.window, 'showInformationMessage').mockImplementation(() => Promise.resolve());
+      const mockShowInfo = jest.spyOn(vscode.window, 'showInformationMessage').mockImplementation(() => Promise.resolve(undefined));
       const testPath = '/test/workspace';
 
       await gitManager.initRepo(testPath);

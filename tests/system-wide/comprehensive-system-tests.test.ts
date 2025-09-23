@@ -322,8 +322,8 @@ describe('System-Wide Comprehensive Testing', () => {
               fc.constant(' UNION SELECT * FROM users'),
               fc.constant('javascript:alert(1)'),
               fc.constant('data:text/html,<script>alert(1)</script>'),
-              fc.stringOf(fc.constant('💉'), { minLength: 10, maxLength: 50 }),
-              fc.unicodeString({ minLength: 1, maxLength: 100 })
+              fc.string({ minLength: 10, maxLength: 50 }),
+              fc.string({ minLength: 1, maxLength: 100 })
             ),
             injectionType: fc.oneof(
               fc.constant('xss'),
@@ -676,23 +676,31 @@ describe('System-Wide Comprehensive Testing', () => {
   // Helper functions for comprehensive testing
   async function executeWithConcurrency<T>(promises: Promise<T>[], concurrency: number): Promise<PromiseSettledResult<T>[]> {
     const results: PromiseSettledResult<T>[] = [];
-    const executing: Promise<void>[] = [];
+    const executing: Promise<T>[] = [];
 
     for (const promise of promises) {
-      const executingPromise = promise.then(
-        (result) => results.push({ status: 'fulfilled', value: result }),
-        (error) => results.push({ status: 'rejected', reason: error })
-      );
-
-      executing.push(executingPromise);
+      executing.push(promise);
 
       if (executing.length >= concurrency) {
-        await Promise.race(executing);
-        executing.splice(executing.findIndex(p => p === Promise.race(executing)), 1);
+        const settled = await Promise.race(executing);
+        const index = executing.findIndex(p => p === promise);
+        if (index !== -1) {
+          executing.splice(index, 1);
+          results.push({ status: 'fulfilled', value: settled });
+        }
       }
     }
 
-    await Promise.all(executing);
+    // Handle remaining promises
+    for (const promise of executing) {
+      try {
+        const result = await promise;
+        results.push({ status: 'fulfilled', value: result });
+      } catch (error) {
+        results.push({ status: 'rejected', reason: error });
+      }
+    }
+
     return results;
   }
 

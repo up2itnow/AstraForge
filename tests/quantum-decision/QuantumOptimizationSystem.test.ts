@@ -130,7 +130,7 @@ describe('QuantumOptimizationSystem', () => {
 
       expect(result).toBeDefined();
       expect(result.bestSolution).toHaveLength(3);
-      expect(result.bestSolution.every(val => val === 0 || val === 1)).toBe(true); // Should be binary
+      expect(result.bestSolution.every((val: number) => val === 0 || val === 1)).toBe(true); // Should be binary
     });
   });
 

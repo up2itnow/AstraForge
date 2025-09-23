@@ -79,9 +79,14 @@ describe('WorkflowManager', () => {
         { id: 'test1', similarity: 0.9, vector: [1, 2, 3], metadata: { plan: 'Previous plan data' } },
       ]);
       mockVector.getContextualInsights.mockResolvedValue({
-        insights: { dominantBehaviorType: 'unknown', averageInnovationIndex: 0.5 },
-        suggestions: [],
-        confidence: 0.8
+        documents: [],
+        insights: {
+          dominantBehaviorType: 'unknown',
+          averageInnovationIndex: 0.5,
+          complexityDistribution: {},
+          recommendedPatterns: [],
+          emergentOpportunities: []
+        }
       });
       mockGit.commit.mockResolvedValue(undefined);
     });

@@ -388,30 +388,47 @@ export class SpecGenerator {
       const response = await this.llmManager.generateResponse('anthropic', prompt);
       return JSON.parse(response);
     } catch (error) {
-      console.error('Error identifying clarifications:', error);
+      logger.error('Error identifying clarifications:', error);
       return [];
     }
   }
 
-  private assembleSpecification(request: SpecificationRequest, sections: any, clarifications: string[]): string {
-    const currentDate = new Date().toISOString().split('T')[0];
-    
+  private replaceTemplateVariables(spec: string, request: SpecificationRequest, sections: Record<string, unknown>, currentDate: string): string {
+    let result = spec;
+
+    result = result.replace('{{FEATURE_NAME}}', String(sections.featureName || 'New Feature'));
+    result = result.replace('{{BRANCH_NAME}}', String(sections.branchName || '001-new-feature'));
+    result = result.replace('{{DATE}}', currentDate);
+    result = result.replace('{{USER_INPUT}}', request.userIdea || 'User provided idea');
+
+    return result;
+  }
+
+  private replaceContentSections(spec: string, sections: Record<string, unknown>, clarifications: string[]): string {
+    let result = spec;
+
+    result = result.replace('{{PRIMARY_USER_STORY}}', (sections.userScenarios as string[])?.join('\n\n') || 'User story to be defined');
+    result = result.replace('{{ACCEPTANCE_SCENARIOS}}', (sections.acceptanceScenarios as string[])?.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n') || 'Scenarios to be defined');
+    result = result.replace('{{EDGE_CASES}}', (sections.edgeCases as string[])?.map((e: string) => `- ${e}`).join('\n') || 'Edge cases to be identified');
+    result = result.replace('{{FUNCTIONAL_REQUIREMENTS}}', (sections.functionalRequirements as string[])?.map((r: string) => `- **${r}**`).join('\n') || 'Requirements to be defined');
+    result = result.replace('{{KEY_ENTITIES}}', (sections.keyEntities as string[])?.map((e: string) => `- **${e}**`).join('\n') || 'Entities to be identified');
+    result = result.replace('{{CLARIFICATIONS_NEEDED}}', clarifications.map(c => `- ${c}`).join('\n') || 'No clarifications needed');
+
+    return result;
+  }
+
+  private getCurrentDate(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  private assembleSpecification(request: SpecificationRequest, sections: Record<string, unknown>, clarifications: string[]): string {
+    const currentDate = this.getCurrentDate();
+
     let spec = this.specTemplate;
-    
-    // Replace template variables
-    spec = spec.replace('{{FEATURE_NAME}}', sections.featureName || 'New Feature');
-    spec = spec.replace('{{BRANCH_NAME}}', sections.branchName || '001-new-feature');
-    spec = spec.replace('{{DATE}}', currentDate);
-    spec = spec.replace('{{USER_INPUT}}', request.userIdea || 'User provided idea');
-    
-    // Replace content sections
-    spec = spec.replace('{{PRIMARY_USER_STORY}}', sections.userScenarios?.join('\n\n') || 'User story to be defined');
-    spec = spec.replace('{{ACCEPTANCE_SCENARIOS}}', sections.acceptanceScenarios?.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n') || 'Scenarios to be defined');
-    spec = spec.replace('{{EDGE_CASES}}', sections.edgeCases?.map((e: string) => `- ${e}`).join('\n') || 'Edge cases to be identified');
-    spec = spec.replace('{{FUNCTIONAL_REQUIREMENTS}}', sections.functionalRequirements?.map((r: string) => `- **${r}**`).join('\n') || 'Requirements to be defined');
-    spec = spec.replace('{{KEY_ENTITIES}}', sections.keyEntities?.map((e: string) => `- **${e}**`).join('\n') || 'Entities to be identified');
-    spec = spec.replace('{{CLARIFICATIONS_NEEDED}}', clarifications.map(c => `- ${c}`).join('\n') || 'No clarifications needed');
-    
+
+    spec = this.replaceTemplateVariables(spec, request, sections, currentDate);
+    spec = this.replaceContentSections(spec, sections, clarifications);
+
     return spec;
   }
 

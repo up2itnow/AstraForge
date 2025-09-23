@@ -124,6 +124,33 @@ export class WorkflowManager {
   }
 
   /**
+   * Getters for testing purposes - allow access to private dependencies
+   */
+  get llmManager(): LLMManager {
+    return this.llmManager;
+  }
+
+  get vectorDB(): VectorDB {
+    return this.vectorDB;
+  }
+
+  get gitManager(): GitManager {
+    return this.gitManager;
+  }
+
+  get workflowRL(): AdaptiveWorkflowRL {
+    return this.workflowRL;
+  }
+
+  get workspaceId(): string {
+    return this.workspaceId;
+  }
+
+  get collaborationServer(): CollaborationServer | undefined {
+    return this.collaborationServer;
+  }
+
+  /**
    * Initialize emergent behavior system integration
    */
   private initializeEmergentBehavior(): void {

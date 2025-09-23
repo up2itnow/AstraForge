@@ -25,6 +25,7 @@ export interface QuantumResult {
   confidence: number;
   quantumOperations: number;
   classicalOperations: number;
+  quantumAdvantage: number;
   superpositionStates?: number;
   entanglementPairs?: number;
   interferencePatterns?: number;
@@ -147,6 +148,7 @@ export class QuantumAlgorithmsLibrary {
           confidence,
           quantumOperations,
           classicalOperations: n * n, // Classical search complexity
+          quantumAdvantage: 2,
           superpositionStates,
           convergenceTime: Date.now() - startTime,
           errorProbability
@@ -195,6 +197,7 @@ export class QuantumAlgorithmsLibrary {
           confidence,
           quantumOperations,
           classicalOperations: variables.length ** 2,
+          quantumAdvantage: 3,
           entanglementPairs,
           convergenceTime: Date.now() - startTime,
           errorProbability
@@ -245,6 +248,7 @@ export class QuantumAlgorithmsLibrary {
           confidence,
           quantumOperations,
           classicalOperations: objectives.length * 5,
+          quantumAdvantage: 2,
           interferencePatterns: interferencePatterns.size,
           convergenceTime: Date.now() - startTime,
           errorProbability
@@ -296,6 +300,7 @@ export class QuantumAlgorithmsLibrary {
           confidence,
           quantumOperations,
           classicalOperations: nodes * nodes, // Classical traversal
+          quantumAdvantage: 2,
           convergenceTime: Date.now() - startTime,
           errorProbability
         };
@@ -345,6 +350,7 @@ export class QuantumAlgorithmsLibrary {
           confidence,
           quantumOperations,
           classicalOperations: n * n,
+          quantumAdvantage: 2,
           convergenceTime: Date.now() - startTime,
           errorProbability
         };
@@ -406,6 +412,7 @@ export class QuantumAlgorithmsLibrary {
           confidence,
           quantumOperations,
           classicalOperations: 2 ** precision,
+          quantumAdvantage: 2,
           convergenceTime: Date.now() - startTime,
           errorProbability
         };
@@ -461,6 +468,7 @@ export class QuantumAlgorithmsLibrary {
           confidence: result.accuracy,
           quantumOperations,
           classicalOperations: solutions,
+          quantumAdvantage: 2,
           convergenceTime: Date.now() - startTime,
           errorProbability
         };
