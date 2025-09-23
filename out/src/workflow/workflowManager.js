@@ -350,9 +350,10 @@ export class WorkflowManager {
     async processUserDecision(decision, suggestions, output, phase) {
         let feedback = 0.7; // Default neutral feedback
         switch (decision) {
-            case 'Proceed as planned':
+            case 'Proceed as planned': {
                 feedback = 0.8;
                 break;
+            }
             case 'Apply suggestions': {
                 feedback = 0.9;
                 const improvedOutput = await this.llmManager.conference(`Apply these suggestions: ${suggestions} to improve: ${output}`);

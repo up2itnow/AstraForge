@@ -199,7 +199,7 @@ export class SpecKitManager {
         return this.workflows.get(workflowId);
     }
     generateWorkflowId() {
-        const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const _timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
         const counter = String(this.workflows.size + 1).padStart(3, '0');
         return `${counter}`;
     }
@@ -389,7 +389,7 @@ All code reviews verify constitutional compliance.
             case 'Create Plan':
                 await this.createImplementationPlan(workflow.id);
                 break;
-            case 'Refine Spec':
+            case 'Refine Spec': {
                 const refinements = await vscode.window.showInputBox({
                     prompt: 'Enter refinements (comma-separated)',
                     placeHolder: 'Add more details about user roles, clarify requirements...'
@@ -398,10 +398,12 @@ All code reviews verify constitutional compliance.
                     await this.refineSpecification(workflow.id, refinements.split(',').map(r => r.trim()));
                 }
                 break;
-            case 'View Spec':
+            }
+            case 'View Spec': {
                 const specUri = vscode.Uri.file(path.join(workflow.specsDir, 'spec.md'));
                 await vscode.window.showTextDocument(specUri);
                 break;
+            }
         }
     }
     async showPlanResults(workflow) {
@@ -418,14 +420,16 @@ All code reviews verify constitutional compliance.
             case 'Generate Tasks':
                 await this.generateTasks(workflow.id);
                 break;
-            case 'View Plan':
+            case 'View Plan': {
                 const planUri = vscode.Uri.file(path.join(workflow.specsDir, 'plan.md'));
                 await vscode.window.showTextDocument(planUri);
                 break;
-            case 'Review Research':
+            }
+            case 'Review Research': {
                 const researchUri = vscode.Uri.file(path.join(workflow.specsDir, 'research.md'));
                 await vscode.window.showTextDocument(researchUri);
                 break;
+            }
         }
     }
     async showTaskResults(workflow) {
@@ -444,15 +448,17 @@ All code reviews verify constitutional compliance.
                 // This would integrate with the existing workflow manager
                 vscode.window.showInformationMessage('🚀 Ready for implementation! Tasks are available in the workflow manager.');
                 break;
-            case 'View Tasks':
+            case 'View Tasks': {
                 const tasksUri = vscode.Uri.file(path.join(workflow.specsDir, 'tasks.md'));
                 await vscode.window.showTextDocument(tasksUri);
                 break;
-            case 'Export Tasks':
+            }
+            case 'Export Tasks': {
                 // Export to project management tool or clipboard
                 await vscode.env.clipboard.writeText(tasks.content);
                 vscode.window.showInformationMessage('📋 Tasks copied to clipboard');
                 break;
+            }
         }
     }
     async cleanupTempFiles() {

@@ -49,20 +49,23 @@ export class ApiTesterProvider implements vscode.WebviewViewProvider {
             await this._handleWorkflowTest(data);
             break;
 
-          case 'validateKey':
+          case 'validateKey': {
             const isValid = this._tester.validateApiKey(data.provider, data.key);
             this._sendMessage('keyValidated', { isValid, provider: data.provider });
             break;
+          }
 
-          case 'getProviders':
+          case 'getProviders': {
             const providers = this._tester.getSupportedProviders();
             this._sendMessage('providersList', { providers });
             break;
+          }
 
-          case 'getModels':
+          case 'getModels': {
             const models = this._tester.getSupportedModels(data.provider);
             this._sendMessage('modelsList', { models, provider: data.provider });
             break;
+          }
 
           default:
             console.warn('Unknown message type:', data.type);

@@ -253,7 +253,7 @@ describe('VectorDB', () => {
 
       expect(mockFs.writeFileSync).toHaveBeenCalledTimes(2);
       expect(mockFs.writeFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('vectordb'),
+        expect.stringContaining('vectors.json'),
         expect.stringContaining('"temporalMetadata"'),
         'utf8'
       );

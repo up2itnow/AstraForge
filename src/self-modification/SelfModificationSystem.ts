@@ -430,7 +430,7 @@ export class SelfModificationSystem {
     if (!this.emergentBehavior) return opportunities;
 
     // Analyze emergent behaviors for optimization opportunities
-    const behaviors = this.emergentBehavior.getBehaviors();
+    const _behaviors = this.emergentBehavior.getBehaviors();
     const stats = this.emergentBehavior.getStats();
 
     // Look for frequently successful behavior patterns that could be optimized
@@ -731,11 +731,11 @@ export class SelfModificationSystem {
   }
 
   // Placeholder methods for actual implementation
-  private isDependencySatisfied(dep: string): boolean {
+  private isDependencySatisfied(_dep: string): boolean {
     return true; // Simplified implementation
   }
 
-  private hasActiveModificationConflict(modification: SelfModification): boolean {
+  private hasActiveModificationConflict(_modification: SelfModification): boolean {
     return false; // Simplified implementation
   }
 

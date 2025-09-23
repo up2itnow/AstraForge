@@ -8,6 +8,8 @@
  * - InsightsEngine: Insight generation and recommendations
  */
 
+import { logger } from '../utils/logger';
+
 export { MetaLearningSystem } from './MetaLearningSystem';
 export { PatternAnalyzer } from './patterns/PatternAnalyzer';
 export { StrategyOptimizer } from './strategies/StrategyOptimizer';
@@ -113,11 +115,11 @@ export class MetaLearningIntegration {
     const insights = this.components.insightsEngine.generateInsights(patterns, strategies, analysis);
 
     // Log key findings
-    console.log(`📊 Meta-learning analysis complete:`);
-    console.log(`   - ${insights.metaInsights.length} new insights generated`);
-    console.log(`   - ${insights.predictiveInsights.length} predictive insights`);
-    console.log(`   - ${insights.strategicRecommendations.length} strategic recommendations`);
-    console.log(`   - ${insights.breakthroughInsights.length} breakthrough insights`);
+    logger.info(`📊 Meta-learning analysis complete:`);
+    logger.info(`   - ${insights.metaInsights.length} new insights generated`);
+    logger.info(`   - ${insights.predictiveInsights.length} predictive insights`);
+    logger.info(`   - ${insights.strategicRecommendations.length} strategic recommendations`);
+    logger.info(`   - ${insights.breakthroughInsights.length} breakthrough insights`);
 
     // Store insights back in meta-learning system
     insights.metaInsights.forEach(insight => {
@@ -177,7 +179,7 @@ export class MetaLearningIntegration {
     // Apply optimizations
     for (const [strategyId, suggestions] of Object.entries(recommendations)) {
       suggestions.forEach(suggestion => {
-        console.log(`🔧 Strategy optimization: ${suggestion.suggestion} (${Math.round(suggestion.expectedImprovement * 100)}% improvement)`);
+        logger.info(`🔧 Strategy optimization: ${suggestion.suggestion} (${Math.round(suggestion.expectedImprovement * 100)}% improvement)`);
       });
     }
 
@@ -185,7 +187,7 @@ export class MetaLearningIntegration {
     const evolutions = this.components.strategyOptimizer.evolveStrategies(strategies, patterns);
 
     evolutions.forEach(evolution => {
-      console.log(`🧬 Strategy evolution: ${evolution.evolvedStrategy.name} (${Math.round(evolution.performanceImprovement * 100)}% improvement)`);
+      logger.info(`🧬 Strategy evolution: ${evolution.evolvedStrategy.name} (${Math.round(evolution.performanceImprovement * 100)}% improvement)`);
     });
   }
 }

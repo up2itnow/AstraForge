@@ -16,6 +16,11 @@ describe('LLMManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     llmManager = new LLMManager();
+    // Mock the panel to have LLMs for conference tests
+    (llmManager as any).panel = [
+      { provider: 'OpenRouter', role: 'primary', model: 'x-ai/grok-2-1212', apiKey: 'test-key-1' },
+      { provider: 'OpenRouter', role: 'secondary', model: 'x-ai/grok-2-1212', apiKey: 'test-key-2' }
+    ];
   });
 
   describe('Initialization', () => {

@@ -3,6 +3,8 @@
  * Uses Q-learning to optimize phase sequencing and decision making
  */
 
+import { logger } from '../utils/logger';
+
 interface WorkflowState {
   currentPhase: string;
   projectComplexity: number; // 0-1 scale
@@ -72,7 +74,7 @@ export class AdaptiveWorkflowRL {
       }
     }
 
-    console.log(
+    logger.info(
       `RL: Selected action ${bestAction.type} for state ${stateKey} (Q-value: ${bestQValue.toFixed(3)})`
     );
     return bestAction;
@@ -133,7 +135,7 @@ export class AdaptiveWorkflowRL {
       this.explorationRate * this.explorationDecay
     );
 
-    console.log(
+    logger.info(
       `RL: Updated Q(${stateKey}, ${actionKey}) from ${oldQValue.toFixed(3)} to ${newQValue.toFixed(3)} (reward: ${reward.toFixed(3)})`
     );
 
@@ -303,9 +305,9 @@ export class AdaptiveWorkflowRL {
 
       // Store in memory for now - in VS Code extension, this would use vscode.ExtensionContext.globalState
       (global as any).astraforge_qtable = serialized;
-      console.log(`RL: Saved Q-table with ${this.qTable.size} states`);
+      logger.info(`RL: Saved Q-table with ${this.qTable.size} states`);
     } catch (error) {
-      console.warn('RL: Failed to save Q-table:', error);
+      logger.warn('RL: Failed to save Q-table:', error);
     }
   }
 
@@ -328,9 +330,9 @@ export class AdaptiveWorkflowRL {
         this.qTable.set(stateData.state, stateActions);
       }
 
-      console.log(`RL: Loaded Q-table with ${this.qTable.size} states`);
+      logger.info(`RL: Loaded Q-table with ${this.qTable.size} states`);
     } catch (error) {
-      console.warn('RL: Failed to load Q-table:', error);
+      logger.warn('RL: Failed to load Q-table:', error);
     }
   }
 

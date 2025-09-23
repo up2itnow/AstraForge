@@ -17,11 +17,26 @@ import { AdaptiveWorkflowRL } from '../rl/adaptiveWorkflow';
 import { CollaborationServer } from '../server/collaborationServer';
 import { MetaLearningIntegration, createMetaLearningSystem } from '../meta-learning';
 import { EmergentBehaviorSystem } from '../emergent-behavior';
+import { logger } from '../utils/logger';
 import * as path from 'path';
 
 /**
  * Metrics tracking for workflow performance and user engagement
  */
+interface WorkflowState {
+  currentPhase: string;
+  projectComplexity: number;
+  userSatisfaction: number;
+  errorRate: number;
+  timeSpent: number;
+}
+
+interface WorkflowAction {
+  type: 'continue' | 'skip' | 'repeat' | 'branch' | 'optimize';
+  target?: string;
+  confidence: number;
+}
+
 interface WorkflowMetrics {
   /** Timestamp when workflow started */
   startTime: number;
@@ -113,7 +128,7 @@ export class WorkflowManager {
    */
   private initializeEmergentBehavior(): void {
     if (this.emergentBehaviorSystem) {
-      console.log('🧬 Emergent behavior system integrated with workflow manager');
+      logger.info('🧬 Emergent behavior system integrated with workflow manager');
     }
   }
 
@@ -143,7 +158,7 @@ export class WorkflowManager {
       );
 
       if (optimalStrategy) {
-        console.log(`🧠 Using meta-learning optimized strategy: ${optimalStrategy.name}`);
+        logger.info(`🧠 Using meta-learning optimized strategy: ${optimalStrategy.name}`);
         // Apply strategy configuration to LLM manager
         // This would configure agent count, rounds, etc.
       }
@@ -159,11 +174,11 @@ export class WorkflowManager {
         });
 
         if (contextualInsights.insights.dominantBehaviorType !== 'unknown') {
-          console.log(`🔍 Found contextual insights: ${contextualInsights.insights.dominantBehaviorType} pattern detected`);
+          logger.info(`🔍 Found contextual insights: ${contextualInsights.insights.dominantBehaviorType} pattern detected`);
           enhancedIdea = `${idea} (Context: ${contextualInsights.insights.dominantBehaviorType}, Innovation: ${Math.round(contextualInsights.insights.averageInnovationIndex * 100)}%)`;
         }
       } catch (error) {
-        console.warn('Failed to get contextual insights:', error);
+        logger.warn('Failed to get contextual insights:', error);
         // Continue with original idea if contextual enhancement fails
       }
 
@@ -203,8 +218,84 @@ export class WorkflowManager {
 
       vscode.window.showInformationMessage('Build Plan ready! Proceeding to phases.');
       await this.executePhase();
-    } catch (error: any) {
+    } catch (error: Error) {
       vscode.window.showErrorMessage(`Workflow failed: ${error.message}`);
+    }
+  }
+
+  private async handleRLRecommendation(phase: string): Promise<{ shouldReturn: boolean; currentState: WorkflowState; recommendedAction: WorkflowAction }> {
+    const currentState = this.getCurrentWorkflowState();
+    const recommendedAction = this.workflowRL.getBestAction(currentState);
+
+    if (recommendedAction.type !== 'continue') {
+      const actionResult = await this.applyRLAction(recommendedAction, phase);
+      if (actionResult.shouldReturn) {
+        return { shouldReturn: true, currentState, recommendedAction };
+      }
+    }
+
+    return { shouldReturn: false, currentState, recommendedAction };
+  }
+
+  private async setupPhaseExecution(phase: string): Promise<string> {
+    // Notify collaboration server about phase start
+    this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'phase_started', {
+      phase,
+      timestamp: Date.now(),
+      projectIdea: this.projectIdea,
+    });
+
+    // Enhanced context retrieval using vector DB
+    const contextText = await this.retrieveContext(phase);
+
+    return contextText;
+  }
+
+  private async generatePhaseOutput(phase: string, contextText: string): Promise<string> {
+    const phasePrompt = this.buildEnhancedPrompt(phase, contextText);
+    const output = await this.llmManager.conference(phasePrompt);
+    return await this.processPhaseOutput(output, phase);
+  }
+
+  private async completePhaseOperations(phase: string, processedOutput: string): Promise<void> {
+    await this.writePhaseOutput(processedOutput, phase);
+    await this.gitManager.commit(`Phase ${phase} complete - ${this.getPhaseMetrics()}`);
+  }
+
+  private async handlePhaseReviewAndSuggestions(phase: string, processedOutput: string, contextText: string): Promise<number> {
+    const review = await this.conductPhaseReview(processedOutput, phase);
+    const suggestions = await this.generateIntelligentSuggestions(phase, processedOutput, contextText);
+
+    const userDecision = await this.getUserDecision(suggestions, review);
+    const userFeedback = await this.processUserDecision(userDecision, suggestions, processedOutput, phase);
+
+    return userFeedback;
+  }
+
+  private async updateRLAndProgress(phase: string, currentState: WorkflowState, recommendedAction: WorkflowAction, userFeedback: number): Promise<void> {
+    const newState = this.getCurrentWorkflowState();
+    const reward = this.workflowRL.calculateReward(
+      currentState,
+      recommendedAction,
+      newState,
+      true, // Phase succeeded
+      userFeedback
+    );
+
+    this.workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
+
+    // Store phase results in vector DB for future context
+    await this.storePhaseContext(phase, await this.processPhaseOutput('', phase), {} as any);
+
+    this.metrics.iterations++;
+    this.currentPhase++;
+
+    if (this.currentPhase < this.phases.length) {
+      vscode.window.showInformationMessage(
+        `Phase ${phase} complete! Next: ${this.phases[this.currentPhase]}. Click "Acknowledge & Proceed".`
+      );
+    } else {
+      await this.completeProject();
     }
   }
 
@@ -213,96 +304,30 @@ export class WorkflowManager {
     this.metrics.phaseStartTime = Date.now();
 
     try {
-      // Get current workflow state for RL
-      const currentState = this.getCurrentWorkflowState();
-
-      // Get RL recommendation for next action
-      const recommendedAction = this.workflowRL.getBestAction(currentState);
-
-      // Apply RL action if not 'continue'
-      if (recommendedAction.type !== 'continue') {
-        const actionResult = await this.applyRLAction(recommendedAction, phase);
-        if (actionResult.shouldReturn) {
-          return;
-        }
+      // Handle RL recommendation
+      const rlResult = await this.handleRLRecommendation(phase);
+      if (rlResult.shouldReturn) {
+        return;
       }
 
-      // Notify collaboration server about phase start
-      this.collaborationServer?.broadcastToWorkspace(this.workspaceId, 'phase_started', {
-        phase,
-        timestamp: Date.now(),
-        projectIdea: this.projectIdea,
-      });
+      const { currentState, recommendedAction } = rlResult;
 
-      // Enhanced context retrieval using vector DB
-      const contextQuery = `${phase} for ${this.projectIdea}`;
-      const contextEmbedding = await this.vectorDB.getEmbedding(contextQuery);
-      const relevantContext = await this.vectorDB.queryEmbedding(contextEmbedding, 3);
+      // Setup phase execution
+      const contextText = await this.setupPhaseExecution(phase);
 
-      const contextText = relevantContext
-        .map(item => item.metadata)
-        .filter(meta => meta && typeof meta === 'object')
-        .map(meta => meta.plan || meta.content || '')
-        .join('\n');
+      // Generate phase output
+      const processedOutput = await this.generatePhaseOutput(phase, contextText);
 
-      // Generate phase content with enhanced prompting
-      const phasePrompt = this.buildEnhancedPrompt(phase, contextText);
-      const output = await this.llmManager.conference(phasePrompt);
+      // Complete phase operations
+      await this.completePhaseOperations(phase, processedOutput);
 
-      // Process and validate output
-      const processedOutput = await this.processPhaseOutput(output, phase);
+      // Handle review and suggestions
+      const userFeedback = await this.handlePhaseReviewAndSuggestions(phase, processedOutput, contextText);
 
-      // Write output to file with better organization
-      await this.writePhaseOutput(processedOutput, phase);
+      // Update RL and progress
+      await this.updateRLAndProgress(phase, currentState, recommendedAction, userFeedback);
 
-      // Git commit with detailed message
-      await this.gitManager.commit(`Phase ${phase} complete - ${this.getPhaseMetrics()}`);
-
-      // Enhanced review with multiple perspectives
-      const review = await this.conductPhaseReview(processedOutput, phase);
-
-      // Intelligent suggestions using context
-      const suggestions = await this.generateIntelligentSuggestions(
-        phase,
-        processedOutput,
-        contextText
-      );
-
-      // User interaction with better UX
-      const userDecision = await this.getUserDecision(suggestions, review);
-      const userFeedback = await this.processUserDecision(
-        userDecision,
-        suggestions,
-        processedOutput,
-        phase
-      );
-
-      // Update RL with feedback
-      const newState = this.getCurrentWorkflowState();
-      const reward = this.workflowRL.calculateReward(
-        currentState,
-        recommendedAction,
-        newState,
-        true, // Phase succeeded
-        userFeedback
-      );
-
-      this.workflowRL.updateQValue(currentState, recommendedAction, reward, newState);
-
-      // Store phase results in vector DB for future context
-      await this.storePhaseContext(phase, processedOutput, review);
-
-      this.metrics.iterations++;
-      this.currentPhase++;
-
-      if (this.currentPhase < this.phases.length) {
-        vscode.window.showInformationMessage(
-          `Phase ${phase} complete! Next: ${this.phases[this.currentPhase]}. Click "Acknowledge & Proceed".`
-        );
-      } else {
-        await this.completeProject();
-      }
-    } catch (error: any) {
+    } catch (error: Error) {
       await this.handlePhaseError(error, phase);
     }
   }
@@ -321,9 +346,9 @@ export class WorkflowManager {
       const port = process.env.NODE_ENV === 'test' ? 0 : 3001;
       this.collaborationServer = new CollaborationServer(port);
       await this.collaborationServer.start();
-      console.log('Collaboration server initialized');
+      logger.info('Collaboration server initialized');
     } catch (error) {
-      console.warn('Failed to start collaboration server:', error);
+      logger.warn('Failed to start collaboration server:', error);
     }
   }
 
@@ -331,13 +356,13 @@ export class WorkflowManager {
     try {
       const metaLearningComponents = createMetaLearningSystem();
       this.metaLearning = new MetaLearningIntegration(metaLearningComponents);
-      console.log('🧠 Meta-learning system initialized');
+      logger.info('🧠 Meta-learning system initialized');
     } catch (error) {
-      console.warn('Failed to initialize meta-learning system:', error);
+      logger.warn('Failed to initialize meta-learning system:', error);
     }
   }
 
-  private getCurrentWorkflowState(): any {
+  private getCurrentWorkflowState(): WorkflowState {
     const totalTime = Date.now() - this.metrics.startTime;
 
     return {
@@ -376,7 +401,7 @@ export class WorkflowManager {
     );
   }
 
-  private async applyRLAction(action: any, phase: string): Promise<{ shouldReturn: boolean }> {
+  private async applyRLAction(action: WorkflowAction, phase: string): Promise<{ shouldReturn: boolean }> {
     switch (action.type) {
       case 'skip':
         vscode.window.showInformationMessage(`RL suggests skipping ${phase} phase`);
@@ -493,9 +518,10 @@ export class WorkflowManager {
     let feedback = 0.7; // Default neutral feedback
 
     switch (decision) {
-      case 'Proceed as planned':
+      case 'Proceed as planned': {
         feedback = 0.8;
         break;
+      }
 
       case 'Apply suggestions': {
         feedback = 0.9;
@@ -550,10 +576,10 @@ export class WorkflowManager {
     await this.vectorDB.addEmbedding(`phase_${phase}_${Date.now()}`, embedding, contextData);
   }
 
-  private async handlePhaseError(error: any, phase: string): Promise<void> {
+  private async handlePhaseError(error: Error, phase: string): Promise<void> {
     this.metrics.errors++;
 
-    console.error(`Phase ${phase} error:`, error);
+    logger.error(`Phase ${phase} error:`, error);
 
     const errorMessage = `Phase ${phase} encountered an error: ${error.message}`;
     const options = ['Retry phase', 'Skip phase', 'Abort workflow'];
@@ -668,7 +694,7 @@ ${bonuses}
         metrics: this.metrics,
         timestamp: Date.now(),
       });
-    } catch (error: any) {
+    } catch (error: Error) {
       vscode.window.showErrorMessage(`Project completion failed: ${error.message}`);
     }
   }

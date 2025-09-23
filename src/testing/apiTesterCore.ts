@@ -132,7 +132,7 @@ export class ApiTesterCore {
     prompts: string[]
   ): Promise<BatchTestResult> {
     const startTime = Date.now();
-    const results: TestResult[] = [];
+    const _results: TestResult[] = [];
 
     // Process prompts in parallel for better performance
     const testPromises = prompts.map(async (prompt, index) => {
@@ -177,7 +177,7 @@ export class ApiTesterCore {
         query,
         latency,
       };
-    } catch (error: any) {
+    } catch (_error: any) {
       const latency = Date.now() - startTime;
       return {
         success: false,

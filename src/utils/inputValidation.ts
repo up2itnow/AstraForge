@@ -108,7 +108,7 @@ function sanitizeInput(input: string, options: ValidationOptions): string {
   let sanitized = input;
 
   // Remove control characters and potentially dangerous content
-  sanitized = sanitized.replace(/[\u0000-\u001F\u007F]/g, '');
+  sanitized = removeControlCharacters(sanitized);
 
   // HTML/Script sanitization
   if (!options.allowHtml) {
@@ -180,58 +180,72 @@ function validatePatterns(sanitizedInput: string, options: ValidationOptions): s
  * @param provider - The provider name for specific validation rules
  * @returns Validation result
  */
-export function validateApiKey(apiKey: string, provider: string): ValidationResult {
-  const errors: string[] = [];
-
+function validateBasicApiKey(apiKey: string, errors: string[]): string | null {
   if (!apiKey || typeof apiKey !== 'string') {
-    return {
-      isValid: false,
-      errors: ['API key must be a non-empty string'],
-    };
+    errors.push('API key must be a non-empty string');
+    return null;
   }
 
-  // Remove whitespace
   const cleanKey = apiKey.trim();
 
-  // Basic length validation
   if (cleanKey.length < 10) {
     errors.push('API key appears to be too short');
+    return null;
   }
 
-  // Provider-specific validation
-  switch (provider.toLowerCase()) {
+  if (!/^[a-zA-Z0-9\-_]+$/.test(cleanKey)) {
+    errors.push('API key contains invalid characters');
+    return null;
+  }
+
+  return cleanKey;
+}
+
+function validateProviderSpecific(apiKey: string, provider: string, errors: string[]): void {
+  const lowerProvider = provider.toLowerCase();
+
+  switch (lowerProvider) {
     case 'openai':
-      if (!cleanKey.startsWith('sk-')) {
+      if (!apiKey.startsWith('sk-')) {
         errors.push('OpenAI API keys should start with "sk-"');
       }
-      if (cleanKey.length < 51) {
+      if (apiKey.length < 51) {
         errors.push('OpenAI API key appears to be invalid length');
       }
       break;
 
     case 'anthropic':
-      if (!cleanKey.startsWith('sk-ant-')) {
+      if (!apiKey.startsWith('sk-ant-')) {
         errors.push('Anthropic API keys should start with "sk-ant-"');
       }
       break;
 
     case 'xai':
-      if (!cleanKey.startsWith('xai-')) {
+      if (!apiKey.startsWith('xai-')) {
         errors.push('xAI API keys should start with "xai-"');
       }
       break;
 
     case 'openrouter':
-      if (!cleanKey.startsWith('sk-or-')) {
+      if (!apiKey.startsWith('sk-or-')) {
         errors.push('OpenRouter API keys should start with "sk-or-"');
       }
       break;
   }
+}
 
-  // Check for suspicious characters
-  if (!/^[a-zA-Z0-9\-_]+$/.test(cleanKey)) {
-    errors.push('API key contains invalid characters');
+export function validateApiKey(apiKey: string, provider: string): ValidationResult {
+  const errors: string[] = [];
+
+  const cleanKey = validateBasicApiKey(apiKey, errors);
+  if (!cleanKey) {
+    return {
+      isValid: false,
+      errors,
+    };
   }
+
+  validateProviderSpecific(cleanKey, provider, errors);
 
   return {
     isValid: errors.length === 0,
@@ -278,7 +292,7 @@ export function validateFileContent(content: string, filename?: string): Validat
   }
 
   // Check for binary content
-  if (/[\u0000-\u0008\u000E-\u001F\u007F]/.test(content)) {
+  if (hasControlCharacters(content)) {
     errors.push('File appears to contain binary data');
   }
 
@@ -297,4 +311,24 @@ export function validateFileContent(content: string, filename?: string): Validat
     errors,
     sanitized: errors.length === 0 ? content : undefined,
   };
+}
+
+/**
+ * Remove control characters from a string
+ */
+function removeControlCharacters(input: string): string {
+  return input.split('').filter(char => {
+    const code = char.charCodeAt(0);
+    return code < 32 || code === 127; // Control characters
+  }).join('');
+}
+
+/**
+ * Check if a string contains control characters
+ */
+function hasControlCharacters(input: string): boolean {
+  return input.split('').some(char => {
+    const code = char.charCodeAt(0);
+    return code < 32 || code === 127; // Control characters
+  });
 }

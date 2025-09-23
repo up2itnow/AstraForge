@@ -414,7 +414,7 @@ export class TaskGenerator {
     }
   }
 
-  private async generateDependencies(tasks: Task[], plan: TechnicalPlan): Promise<TaskDependency[]> {
+  private async generateDependencies(tasks: Task[], _plan: TechnicalPlan): Promise<TaskDependency[]> {
     const prompt = `
     Analyze these tasks and generate dependencies:
     
@@ -659,7 +659,7 @@ export class TaskGenerator {
     
     // Check TDD compliance
     const testTasks = taskList.tasks.filter(t => t.type === 'test');
-    const implementationTasks = taskList.tasks.filter(t => t.type === 'implementation');
+    const _implementationTasks = taskList.tasks.filter(t => t.type === 'implementation');
     
     if (testTasks.length === 0) {
       issues.push('No test tasks found - TDD requires tests first');

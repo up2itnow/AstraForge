@@ -12,7 +12,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
+import * as _vscode from 'vscode';
 import { logger } from '../../utils/logger';
 
 export interface CodeModification {
@@ -291,8 +291,8 @@ export class CodeModificationSystem {
     const averageExecutionTime = allResults.reduce((sum, r) => sum + r.performance.executionTime, 0) / allResults.length || 0;
 
     // Count modifications per file
-    const fileCounts = new Map<string, number>();
-    allResults.forEach(result => {
+    const _fileCounts = new Map<string, number>();
+    allResults.forEach(_result => {
       // This would need access to the original modification to get the file
       // For now, return empty array
     });

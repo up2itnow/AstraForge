@@ -120,7 +120,7 @@ export class SelfAnalysisEngine {
     try {
       const content = fs.readFileSync(filePath, 'utf8');
       const lines = content.split('\n');
-      const fileName = path.basename(filePath);
+      const _fileName = path.basename(filePath);
       const relativePath = path.relative(this.workspacePath, filePath);
 
       // Calculate file metrics
@@ -531,7 +531,7 @@ export class SelfAnalysisEngine {
     const results: AnalysisResult[] = [];
 
     // Analyze overall architecture patterns
-    const files = await this.getSourceFiles();
+    const _files = await this.getSourceFiles();
     const directories = this.getDirectories();
 
     // Check for proper separation of concerns

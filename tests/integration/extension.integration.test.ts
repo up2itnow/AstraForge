@@ -25,6 +25,8 @@ describe('AstraForge Extension Integration', () => {
 
     // Initialize components in integration order
     llmManager = new LLMManager();
+    // Mock the panel to prevent iteration errors
+    (llmManager as any).panel = [];
     vectorDB = new VectorDB('/test/integration');
     gitManager = new GitManager();
     workflowManager = new WorkflowManager(llmManager, vectorDB, gitManager);
