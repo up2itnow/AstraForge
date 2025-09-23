@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { CommitAnalyzer, SeverityAnalysis } from '../utils/commitAnalyzer';
+import { handleError, withErrorHandling, ErrorContext } from '../utils/errorHandler';
+import { performanceMonitor } from '../utils/performance';
 
 const execAsync = promisify(exec);
 
@@ -133,5 +136,106 @@ export class GitManager {
         vscode.window.showErrorMessage(`Git commit failed: ${error.message}`);
       }
     }
+  }
+
+  /**
+   * Commit with severity analysis for better categorization
+   */
+  async commitWithSeverityAnalysis(message: string): Promise<{
+    committed: boolean;
+    analysis: SeverityAnalysis;
+  }> {
+    return performanceMonitor.timeAsync('git-commit-with-analysis', async () => {
+      const analyzer = new CommitAnalyzer();
+      const analysis = analyzer.analyzeSeverity(message);
+      
+      try {
+        await this.commit(message);
+        return { committed: true, analysis };
+      } catch (error) {
+        handleError(error, {
+          operation: 'commitWithSeverityAnalysis',
+          component: 'GitManager',
+          metadata: { message, analysis }
+        });
+        return { committed: false, analysis };
+      }
+    }).then(result => result.result);
+  }
+
+  /**
+   * Get repository status with error handling
+   */
+  async getStatusSafe(): Promise<string | null> {
+    return withErrorHandling(
+      () => this.getStatus(),
+      {
+        operation: 'getStatus',
+        component: 'GitManager'
+      }
+    );
+  }
+
+  /**
+   * Get repository diff with error handling  
+   */
+  async getDiffSafe(): Promise<string | null> {
+    return withErrorHandling(
+      () => this.getDiff(),
+      {
+        operation: 'getDiff', 
+        component: 'GitManager'
+      }
+    );
+  }
+
+  /**
+   * Check if repository is clean (no uncommitted changes)
+   */
+  async isRepositoryClean(): Promise<boolean> {
+    try {
+      const { stdout } = await execAsync('git status --porcelain', { cwd: this.workspacePath });
+      return stdout.trim() === '';
+    } catch (error) {
+      handleError(error, {
+        operation: 'isRepositoryClean',
+        component: 'GitManager'
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Get current branch name
+   */
+  async getCurrentBranch(): Promise<string | null> {
+    return withErrorHandling(async () => {
+      const { stdout } = await execAsync('git branch --show-current', { cwd: this.workspacePath });
+      return stdout.trim();
+    }, {
+      operation: 'getCurrentBranch',
+      component: 'GitManager'
+    });
+  }
+
+  /**
+   * Get commit history
+   */
+  async getCommitHistory(limit = 10): Promise<Array<{ hash: string; message: string; author: string; date: string }> | null> {
+    return withErrorHandling(async () => {
+      const { stdout } = await execAsync(
+        `git log --oneline --pretty=format:"%H|%s|%an|%ad" --date=short -n ${limit}`,
+        { cwd: this.workspacePath }
+      );
+      
+      return stdout.trim().split('\n').map(line => {
+        const [hash, message, author, date] = line.split('|');
+        return { hash, message, author, date };
+      });
+    }, {
+      operation: 'getCommitHistory',
+      component: 'GitManager',
+      metadata: { limit }
+    });
   }
 }

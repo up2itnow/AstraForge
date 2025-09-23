@@ -311,4 +311,60 @@ Respond with ONLY the option you choose, exactly as written.`;
     }
     return this.queryLLM(providerIndex, prompt);
   }
+
+  /**
+   * Get available providers list
+   */
+  getAvailableProviders(): string[] {
+    return this.panel.map(config => config.provider);
+  }
+
+  /**
+   * Check if a provider is available
+   */
+  isProviderAvailable(provider: string): boolean {
+    return this.panel.some(config => config.provider.toLowerCase() === provider.toLowerCase());
+  }
+
+  /**
+   * Get provider configuration
+   */
+  getProviderConfig(provider: string): LLMConfig | undefined {
+    return this.panel.find(config => config.provider.toLowerCase() === provider.toLowerCase());
+  }
+
+  /**
+   * Add or update provider configuration
+   */
+  updateProviderConfig(config: LLMConfig): void {
+    const existingIndex = this.panel.findIndex(p => p.provider === config.provider);
+    if (existingIndex >= 0) {
+      this.panel[existingIndex] = config;
+    } else {
+      this.panel.push(config);
+    }
+    
+    // Initialize the provider if not already done
+    if (!this.providers.has(config.provider)) {
+      try {
+        const provider = createProvider(config.provider);
+        this.providers.set(config.provider, provider);
+      } catch (error) {
+        console.error(`Failed to initialize provider ${config.provider}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Remove provider configuration
+   */
+  removeProvider(provider: string): boolean {
+    const index = this.panel.findIndex(p => p.provider === provider);
+    if (index >= 0) {
+      this.panel.splice(index, 1);
+      this.providers.delete(provider);
+      return true;
+    }
+    return false;
+  }
 }
