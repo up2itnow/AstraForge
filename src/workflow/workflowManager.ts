@@ -87,6 +87,15 @@ export class WorkflowManager {
   /** Unique identifier for this workspace session */
   private workspaceId: string;
 
+  /** LLM Manager for provider interactions */
+  private llmManager: LLMManager;
+
+  /** Vector database for context storage and retrieval */
+  private vectorDB: VectorDB;
+
+  /** Git integration for version control */
+  private gitManager: GitManager;
+
   /** Meta-learning integration for recursive self-improvement */
   private metaLearning?: MetaLearningIntegration;
 
@@ -102,11 +111,14 @@ export class WorkflowManager {
    * @param emergentBehaviorSystem - System for emergent behavior detection
    */
   constructor(
-    private llmManager: LLMManager,
-    private vectorDB: VectorDB,
-    private gitManager: GitManager,
+    llmManager: LLMManager,
+    vectorDB: VectorDB,
+    gitManager: GitManager,
     emergentBehaviorSystem?: EmergentBehaviorSystem
   ) {
+    this.llmManager = llmManager;
+    this.vectorDB = vectorDB;
+    this.gitManager = gitManager;
     this.workflowRL = new AdaptiveWorkflowRL();
     this.workspaceId = `workspace_${Date.now()}`;
     this.emergentBehaviorSystem = emergentBehaviorSystem;
@@ -121,33 +133,6 @@ export class WorkflowManager {
     this.initializeCollaboration();
     this.initializeMetaLearning();
     this.initializeEmergentBehavior();
-  }
-
-  /**
-   * Getters for testing purposes - allow access to private dependencies
-   */
-  get llmManager(): LLMManager {
-    return this.llmManager;
-  }
-
-  get vectorDB(): VectorDB {
-    return this.vectorDB;
-  }
-
-  get gitManager(): GitManager {
-    return this.gitManager;
-  }
-
-  get workflowRL(): AdaptiveWorkflowRL {
-    return this.workflowRL;
-  }
-
-  get workspaceId(): string {
-    return this.workspaceId;
-  }
-
-  get collaborationServer(): CollaborationServer | undefined {
-    return this.collaborationServer;
   }
 
   /**

@@ -36,9 +36,6 @@ export class WorkflowManager {
      * @param emergentBehaviorSystem - System for emergent behavior detection
      */
     constructor(llmManager, vectorDB, gitManager, emergentBehaviorSystem) {
-        this.llmManager = llmManager;
-        this.vectorDB = vectorDB;
-        this.gitManager = gitManager;
         /** Current phase index in the workflow */
         this.currentPhase = 0;
         /** Ordered list of workflow phases */
@@ -47,6 +44,9 @@ export class WorkflowManager {
         this.projectIdea = '';
         /** Generated project plan */
         this.buildPlan = '';
+        this.llmManager = llmManager;
+        this.vectorDB = vectorDB;
+        this.gitManager = gitManager;
         this.workflowRL = new AdaptiveWorkflowRL();
         this.workspaceId = `workspace_${Date.now()}`;
         this.emergentBehaviorSystem = emergentBehaviorSystem;
